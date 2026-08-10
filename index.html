@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Document Management — Metadata Autodetect Prototype</title>
+<style>
+  :root {
+    /* Gray scale (HSL 200°, 8% saturation) — Procore core tokens */
+    --gray-10: hsl(200, 8%, 10%);
+    --gray-15: hsl(200, 8%, 15%);
+    --gray-20: hsl(200, 8%, 20%);
+    --gray-30: hsl(200, 8%, 30%);
+    --gray-40: hsl(200, 8%, 40%);
+    --gray-50: hsl(200, 8%, 50%);
+    --gray-70: hsl(200, 8%, 70%);
+    --gray-85: hsl(200, 8%, 85%);
+    --gray-90: hsl(200, 8%, 90%);
+    --gray-94: hsl(200, 8%, 94%);
+    --gray-96: hsl(200, 8%, 96%);
+    --gray-98: hsl(200, 8%, 98%);
+
+    /* Brand */
+    --blue-40: hsl(218, 75%, 40%);
+    --blue-50: hsl(218, 75%, 50%);
+    --blue-96: hsl(218, 75%, 96%);
+    --orange-40: hsl(19, 100%, 40%);
+    --orange-50: hsl(19, 100%, 50%);
+    --orange-60: hsl(19, 100%, 45%);
+    --green-45: hsl(145, 63%, 37%);
+    --green-96: hsl(145, 50%, 95%);
+    --red-50: hsl(4, 75%, 50%);
+    --red-96: hsl(4, 75%, 96%);
+    --yellow-50: hsl(38, 92%, 50%);
+    --yellow-96: hsl(38, 92%, 95%);
+    --white: #ffffff;
+
+    /* Spacing */
+    --sp-xs: 4px;
+    --sp-sm: 8px;
+    --sp-md: 12px;
+    --sp-lg: 16px;
+    --sp-xl: 24px;
+    --sp-2xl: 32px;
+
+    /* Typography */
+    --font: Inter, 'Noto Sans JP', 'Noto Sans KR', 'Noto Sans SC', 'Noto Sans TC', -apple-system, BlinkMacSystemFont, sans-serif;
+    --radius-sm: 2px;
+    --radius-md: 4px;
+    --radius-lg: 8px;
+    --shadow-md: 0 2px 8px rgba(0,0,0,0.12);
+    --shadow-lg: 0 4px 16px rgba(0,0,0,0.16);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--font);
+    font-size: 14px;
+    color: var(--gray-20);
+    background: var(--gray-94);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  button { font-family: inherit; cursor: pointer; }
+
+  /* ─────────────── Top Nav ─────────────── */
+  .topnav {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-md);
+    background: var(--gray-15);
+    color: var(--white);
+    height: 56px;
+    padding: 0 var(--sp-md);
+    flex-shrink: 0;
+  }
+  .nav-home {
+    width: 40px; height: 40px;
+    background: var(--orange-50);
+    border-radius: var(--radius-md);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .nav-wordmark { font-weight: 800; font-size: 15px; letter-spacing: .5px; color: var(--white); }
+  .nav-select {
+    display: flex; align-items: center; gap: var(--sp-sm);
+    border: 1px solid var(--gray-40);
+    border-radius: var(--radius-md);
+    padding: 5px var(--sp-sm);
+    height: 40px; min-width: 150px;
+    cursor: pointer;
+  }
+  .nav-select:hover { background: var(--gray-20); }
+  .nav-select .label { display: flex; flex-direction: column; line-height: 1.2; }
+  .nav-select .label .top { font-size: 11px; color: var(--gray-70); }
+  .nav-select .label .bottom { font-size: 13px; font-weight: 600; color: var(--white); }
+  .nav-select .chev { margin-left: auto; color: var(--gray-70); }
+  .nav-search {
+    display: flex; align-items: center; gap: var(--sp-sm);
+    background: var(--white);
+    border-radius: var(--radius-md);
+    padding: 0 var(--sp-sm);
+    height: 40px; flex: 1; max-width: 460px;
+    color: var(--gray-50);
+  }
+  .nav-search input { border: none; outline: none; flex: 1; font-size: 13px; color: var(--gray-20); }
+  .nav-kbd {
+    display: flex; gap: 3px;
+  }
+  .nav-kbd span {
+    background: var(--gray-94); color: var(--gray-40);
+    border-radius: var(--radius-sm); padding: 1px 5px; font-size: 11px; font-weight: 600;
+  }
+  .nav-item {
+    display: flex; align-items: center; gap: 6px; color: var(--white);
+    padding: 0 var(--sp-sm); height: 40px; border-radius: var(--radius-md); cursor: pointer;
+  }
+  .nav-item:hover { background: var(--gray-20); }
+  .nav-item .label { display: flex; flex-direction: column; line-height: 1.2; }
+  .nav-item .label .top { font-size: 11px; color: var(--gray-70); }
+  .nav-item .label .bottom { font-size: 13px; font-weight: 600; }
+  .nav-icons { display: flex; align-items: center; gap: var(--sp-xs); margin-left: auto; }
+  .nav-icon-btn {
+    width: 34px; height: 34px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--white); background: transparent; border: none;
+  }
+  .nav-icon-btn:hover { background: var(--gray-20); }
+  .nav-avatar {
+    width: 34px; height: 34px; border-radius: 50%;
+    background: var(--gray-30); color: var(--white);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700;
+  }
+
+  /* ─────────────── Page ─────────────── */
+  .page { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: var(--gray-94); }
+
+  .page-header {
+    background: var(--white);
+    padding: var(--sp-lg) var(--sp-xl) 0;
+    flex-shrink: 0;
+  }
+  .page-header-top { display: flex; align-items: center; justify-content: space-between; }
+  .page-title { display: flex; align-items: center; gap: var(--sp-sm); }
+  .page-title .gear { color: var(--orange-50); }
+  .page-title h1 { font-size: 20px; font-weight: 600; color: var(--gray-15); }
+  .page-actions { display: flex; align-items: center; gap: var(--sp-sm); }
+
+  /* Buttons */
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    border-radius: var(--radius-md); font-size: 13px; font-weight: 600;
+    padding: 0 var(--sp-md); height: 36px; border: 1px solid transparent;
+    white-space: nowrap;
+  }
+  .btn-secondary { background: var(--gray-96); color: var(--gray-20); border-color: var(--gray-85); }
+  .btn-secondary:hover { background: var(--gray-90); }
+  .btn-primary { background: var(--orange-50); color: var(--white); }
+  .btn-primary:hover { background: var(--orange-40); }
+  .btn .chev { opacity: .9; }
+  .btn-split { padding-right: var(--sp-sm); }
+
+  /* Tabs */
+  .tabs { display: flex; gap: var(--sp-xl); margin-top: var(--sp-lg); border-bottom: 1px solid var(--gray-90); }
+  .tab {
+    padding: var(--sp-sm) 2px var(--sp-md); font-size: 14px; color: var(--gray-40);
+    border-bottom: 3px solid transparent; margin-bottom: -1px; cursor: pointer; font-weight: 500;
+  }
+  .tab:hover { color: var(--gray-20); }
+  .tab.active { color: var(--gray-15); font-weight: 600; border-bottom-color: var(--orange-50); }
+
+  /* Body layout */
+  .content { flex: 1; display: flex; overflow: hidden; padding: var(--sp-lg) var(--sp-xl) var(--sp-xl); gap: var(--sp-lg); }
+
+  /* Left rail */
+  .rail {
+    width: 250px; flex-shrink: 0; background: var(--white);
+    border: 1px solid var(--gray-90); border-radius: var(--radius-md);
+    padding: var(--sp-lg); overflow-y: auto;
+  }
+  .rail-header { display: flex; align-items: center; gap: 6px; font-weight: 700; font-size: 15px; color: var(--gray-15); margin-bottom: var(--sp-lg); }
+  .rail-header .q { color: var(--gray-50); }
+  .rail-group { margin-bottom: var(--sp-sm); }
+  .rail-group-header {
+    display: flex; align-items: center; gap: var(--sp-sm); padding: 6px 4px;
+    font-weight: 600; color: var(--gray-15); cursor: pointer; border-radius: var(--radius-sm);
+  }
+  .rail-group-header:hover { background: var(--gray-96); }
+  .rail-item {
+    padding: 6px 4px 6px 30px; color: var(--gray-30); cursor: pointer; border-radius: var(--radius-sm); font-size: 13px;
+  }
+  .rail-item:hover { background: var(--gray-96); }
+  .rail-item.active { background: var(--blue-96); color: var(--blue-40); font-weight: 600; }
+
+  /* Main panel */
+  .panel {
+    flex: 1; background: var(--white); border: 1px solid var(--gray-90);
+    border-radius: var(--radius-md); display: flex; flex-direction: column; overflow: hidden;
+  }
+  .panel-header { display: flex; align-items: center; gap: var(--sp-md); padding: var(--sp-lg) var(--sp-lg) var(--sp-md); }
+  .back-btn {
+    width: 34px; height: 34px; background: var(--blue-40); border: none; border-radius: var(--radius-md);
+    display: flex; align-items: center; justify-content: center; color: var(--white); flex-shrink: 0;
+  }
+  .back-btn:hover { background: var(--blue-50); }
+  .panel-header h2 { font-size: 17px; font-weight: 600; color: var(--gray-15); }
+
+  .panel-toolbar { display: flex; align-items: center; gap: var(--sp-md); padding: 0 var(--sp-lg) var(--sp-md); }
+  .search-input {
+    display: flex; align-items: center; gap: var(--sp-sm); border: 1px solid var(--gray-85);
+    border-radius: var(--radius-md); padding: 0 var(--sp-sm); height: 36px; width: 300px; color: var(--gray-50);
+  }
+  .search-input input { border: none; outline: none; flex: 1; font-size: 13px; color: var(--gray-20); }
+  .toolbar-btn {
+    display: inline-flex; align-items: center; gap: 6px; background: transparent; border: none;
+    color: var(--gray-30); font-size: 13px; font-weight: 600; padding: 8px; border-radius: var(--radius-sm);
+  }
+  .toolbar-btn:hover { background: var(--gray-96); }
+  .toolbar-spacer { flex: 1; }
+
+  /* Table */
+  .table-wrap { flex: 1; overflow: auto; display: flex; flex-direction: column; }
+  table.grid { width: 100%; border-collapse: collapse; }
+  table.grid thead th {
+    text-align: left; font-size: 13px; font-weight: 600; color: var(--gray-20);
+    padding: var(--sp-md) var(--sp-lg); background: var(--gray-98);
+    border-top: 1px solid var(--gray-90); border-bottom: 1px solid var(--gray-90);
+    white-space: nowrap; position: sticky; top: 0;
+  }
+  table.grid th .th-inner { display: flex; align-items: center; gap: 6px; }
+  table.grid th .th-menu { margin-left: auto; color: var(--gray-50); cursor: pointer; }
+  table.grid th .q { color: var(--gray-50); }
+
+  /* Empty state */
+  .empty-state {
+    flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; padding: var(--sp-2xl);
+  }
+  .empty-illus { margin-bottom: var(--sp-xl); }
+  .empty-state h3 { font-size: 20px; font-weight: 700; color: var(--gray-15); max-width: 360px; margin-bottom: var(--sp-md); }
+  .empty-state p { color: var(--gray-40); max-width: 420px; line-height: 1.6; margin-bottom: var(--sp-xl); }
+
+  /* Panel footer */
+  .panel-footer {
+    display: flex; align-items: center; justify-content: flex-end; gap: var(--sp-lg);
+    padding: var(--sp-md) var(--sp-lg); border-top: 1px solid var(--gray-90); color: var(--gray-40); font-size: 13px;
+  }
+  .footer-page { display: flex; align-items: center; gap: var(--sp-sm); }
+  .footer-select {
+    display: flex; align-items: center; gap: 6px; border: 1px solid var(--gray-85);
+    border-radius: var(--radius-sm); padding: 3px var(--sp-sm); cursor: pointer;
+  }
+  .footer-nav { display: flex; gap: var(--sp-xs); }
+  .footer-nav button {
+    width: 28px; height: 28px; border: 1px solid var(--gray-85); background: var(--white);
+    border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; color: var(--gray-40);
+  }
+  .footer-nav button:hover { background: var(--gray-96); }
+
+  /* ─────────────── Dropdown menu ─────────────── */
+  .menu {
+    position: absolute; background: var(--white); border: 1px solid var(--gray-85);
+    border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); padding: var(--sp-sm) 0;
+    min-width: 230px; z-index: 100; display: none;
+  }
+  .menu.open { display: block; }
+  .menu-label {
+    font-size: 13px; font-weight: 700; color: var(--gray-15); padding: var(--sp-sm) var(--sp-lg) var(--sp-xs);
+  }
+  .menu-item {
+    padding: var(--sp-sm) var(--sp-lg); font-size: 14px; color: var(--gray-20); cursor: pointer;
+    display: flex; align-items: center; gap: var(--sp-sm);
+  }
+  .menu-item:hover { background: var(--blue-96); color: var(--blue-40); }
+  .menu-divider { height: var(--sp-xs); }
+
+  /* Screen router */
+  .screen { display: none; flex: 1; flex-direction: column; overflow: hidden; }
+  .screen.active { display: flex; }
+
+  .hidden { display: none !important; }
+
+  /* ─────────────── Simulated macOS Finder open-dialog ───────────────
+     NOTE: This is the native OS file picker, NOT a Procore component.
+     It is intentionally styled to macOS dark-mode conventions (system
+     grays/blues, SF-style font) so the demo is deterministic. */
+  .os-backdrop {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.55);
+    display: none; align-items: center; justify-content: center; z-index: 500;
+  }
+  .os-backdrop.open { display: flex; }
+  .finder {
+    width: 920px; max-width: 94vw; height: 600px; max-height: 88vh;
+    background: #2b2b2e; border-radius: 12px; overflow: hidden;
+    display: flex; flex-direction: column; box-shadow: 0 24px 60px rgba(0,0,0,0.5);
+    color: #e6e6e8;
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', var(--font);
+    font-size: 13px;
+    /* animate in */
+    transform: scale(.98); opacity: 0; transition: transform .12s ease, opacity .12s ease;
+  }
+  .os-backdrop.open .finder { transform: scale(1); opacity: 1; }
+  .finder-toolbar {
+    display: flex; align-items: center; gap: 12px; padding: 10px 12px;
+    background: #323236; border-bottom: 1px solid #1f1f22;
+  }
+  .finder-navbtns { display: flex; gap: 4px; }
+  .finder-navbtns button, .finder-viewbtn {
+    width: 30px; height: 24px; background: #48484c; border: none; border-radius: 5px;
+    color: #c7c7cc; display: flex; align-items: center; justify-content: center;
+  }
+  .finder-navbtns button:disabled { color: #6a6a6e; }
+  .finder-view { display: flex; gap: 2px; background: #48484c; border-radius: 5px; padding: 2px; }
+  .finder-view button {
+    width: 30px; height: 20px; background: transparent; border: none; color: #c7c7cc;
+    border-radius: 4px; display: flex; align-items: center; justify-content: center;
+  }
+  .finder-view button.active { background: #6a6a6e; }
+  .finder-crumb {
+    display: flex; align-items: center; gap: 6px; background: #48484c; border-radius: 6px;
+    padding: 3px 8px; color: #e6e6e8; min-width: 200px;
+  }
+  .finder-crumb .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .finder-search {
+    display: flex; align-items: center; gap: 6px; background: #48484c; border-radius: 6px;
+    padding: 3px 8px; margin-left: auto; width: 180px; color: #9a9a9e;
+  }
+  .finder-search input { background: transparent; border: none; outline: none; color: #e6e6e8; flex: 1; font-size: 13px; }
+  .finder-body { flex: 1; display: flex; overflow: hidden; }
+  .finder-sidebar {
+    width: 180px; flex-shrink: 0; background: #252528; padding: 8px 6px; overflow-y: auto;
+    border-right: 1px solid #1f1f22;
+  }
+  .finder-section { color: #8e8e93; font-size: 11px; font-weight: 600; padding: 8px 8px 4px; }
+  .finder-sb-item {
+    display: flex; align-items: center; gap: 8px; padding: 4px 8px; border-radius: 5px;
+    color: #e6e6e8; cursor: default;
+  }
+  .finder-sb-item:hover { background: #35353a; }
+  .finder-sb-item .ic { width: 16px; height: 16px; flex-shrink: 0; }
+  .tagdot { width: 11px; height: 11px; border-radius: 50%; margin: 0 3px; }
+  .finder-main { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: #2b2b2e; }
+  .finder-colhead {
+    display: grid; grid-template-columns: 1fr 90px 130px 150px; gap: 0;
+    padding: 6px 12px; color: #9a9a9e; font-size: 12px; border-bottom: 1px solid #1f1f22;
+  }
+  .finder-colhead div { border-left: 1px solid #3a3a3e; padding-left: 8px; }
+  .finder-colhead div:first-child { border-left: none; padding-left: 0; }
+  .finder-list { flex: 1; overflow-y: auto; }
+  .finder-row {
+    display: grid; grid-template-columns: 1fr 90px 130px 150px; align-items: center;
+    padding: 5px 12px; color: #e6e6e8; cursor: default; user-select: none;
+  }
+  .finder-row:nth-child(even) { background: rgba(255,255,255,0.02); }
+  .finder-row.selected { background: #1a63d6; color: #fff; }
+  .finder-row .fname { display: flex; align-items: center; gap: 8px; overflow: hidden; }
+  .finder-row .fname .label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .finder-row .icloud { margin-left: auto; opacity: .8; }
+  .finder-row .col { padding-left: 8px; color: inherit; opacity: .95; }
+  .finder-footer {
+    display: flex; align-items: center; padding: 12px; gap: 12px;
+    border-top: 1px solid #1f1f22; background: #2b2b2e;
+  }
+  .finder-btn {
+    padding: 5px 16px; border-radius: 6px; font-size: 13px; font-weight: 500; border: none;
+    background: #55555a; color: #fff;
+  }
+  .finder-btn.spacer { margin-right: auto; }
+  .finder-btn.primary { background: #1a6fe0; }
+  .finder-btn:hover { filter: brightness(1.1); }
+
+  /* ─────────────── Upload / auto-detect processing state ─────────────── */
+  .processing-state {
+    flex: 1; display: none; flex-direction: column; padding: var(--sp-xl); overflow-y: auto;
+  }
+  .processing-state.active { display: flex; }
+  .processing-head { margin-bottom: var(--sp-lg); }
+  .processing-head h3 { font-size: 17px; font-weight: 700; color: var(--gray-15); margin-bottom: var(--sp-xs); display: flex; align-items: center; gap: var(--sp-sm); }
+  .processing-head p { color: var(--gray-40); }
+  .spinner {
+    width: 18px; height: 18px; border: 2px solid var(--gray-85); border-top-color: var(--blue-40);
+    border-radius: 50%; animation: spin .8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .upload-row {
+    display: flex; align-items: center; gap: var(--sp-md); padding: var(--sp-md);
+    border: 1px solid var(--gray-90); border-radius: var(--radius-md); margin-bottom: var(--sp-sm);
+    background: var(--white);
+  }
+  .upload-row .fileicon { color: var(--red-50); flex-shrink: 0; }
+  .upload-row .meta { flex: 1; min-width: 0; }
+  .upload-row .fn { font-weight: 600; color: var(--gray-15); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .upload-row .sub { font-size: 12px; color: var(--gray-50); }
+  .progress-track { height: 6px; background: var(--gray-90); border-radius: 3px; overflow: hidden; margin-top: 6px; }
+  .progress-fill { height: 100%; width: 0%; background: var(--blue-40); border-radius: 3px; transition: width .3s ease; }
+  .upload-status { font-size: 12px; font-weight: 600; color: var(--gray-40); white-space: nowrap; display: flex; align-items: center; gap: 6px; }
+  .upload-status.done { color: var(--green-45); }
+
+  /* ─────────────── Populated uploads table (processing) ─────────────── */
+  .table-mode { flex: 1; overflow: auto; }
+  table.uploads { border-collapse: separate; border-spacing: 0; width: max-content; min-width: 100%; }
+  table.uploads th, table.uploads td {
+    padding: 9px 16px; border-bottom: 1px solid var(--gray-90); text-align: left;
+    white-space: nowrap; vertical-align: middle;
+  }
+  table.uploads thead th {
+    background: var(--gray-98); font-size: 13px; font-weight: 600; color: var(--gray-20);
+    position: sticky; top: 0; z-index: 2; border-top: 1px solid var(--gray-90);
+  }
+  table.uploads thead th .th-inner { display: flex; align-items: center; gap: 6px; }
+  table.uploads thead th .th-menu { margin-left: 4px; color: var(--gray-50); cursor: pointer; }
+  table.uploads .col-check { width: 44px; text-align: center; }
+  table.uploads tbody tr:hover { background: var(--gray-98); }
+  .req-processing { display: inline-flex; align-items: center; gap: 8px; color: var(--gray-40); font-style: italic; }
+  .mini-spin {
+    width: 15px; height: 15px; border: 2px solid var(--gray-85); border-top-color: var(--gray-40);
+    border-radius: 50%; animation: spin .8s linear infinite; display: inline-block; flex-shrink: 0;
+  }
+  .file-cell { display: inline-block; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; }
+  .file-link { color: var(--blue-40); text-decoration: none; }
+  .file-link:hover { text-decoration: underline; }
+  .name-placeholder { color: var(--gray-50); letter-spacing: 1px; }
+  .checkbox {
+    width: 16px; height: 16px; border: 1.5px solid var(--gray-50); border-radius: 3px;
+    display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
+    background: var(--white); vertical-align: middle; color: var(--white);
+  }
+  .checkbox.checked { background: var(--blue-40); border-color: var(--blue-40); }
+
+  /* metadata (auto-detect) cell */
+  .mcell {
+    display: flex; align-items: center; gap: 8px; min-width: 150px; height: 34px;
+    border: 1px solid var(--gray-85); border-radius: var(--radius-md); padding: 0 10px;
+    background: var(--white); cursor: pointer; color: var(--gray-30);
+  }
+  .mcell:hover { border-color: var(--gray-50); background: var(--gray-98); }
+  .mcell.editing { border-color: var(--blue-40); box-shadow: 0 0 0 2px var(--blue-96); cursor: text; background: var(--white); }
+  .mcell.filled { color: var(--gray-15); }
+  .mcell input {
+    border: none; outline: none; flex: 1; font-size: 14px; font-family: var(--font);
+    background: transparent; color: var(--gray-15); width: 100%;
+  }
+
+  /* shared hover tooltip for loading cells */
+  .cell-tooltip {
+    position: fixed; z-index: 600; background: var(--white); color: var(--gray-20);
+    border: 1px solid var(--gray-85); border-radius: var(--radius-md); box-shadow: var(--shadow-lg);
+    padding: 8px 12px; font-size: 13px; line-height: 1.45; max-width: 220px; display: none; pointer-events: none;
+  }
+  .cell-tooltip::after {
+    content: ''; position: absolute; bottom: -6px; left: 22px; width: 11px; height: 11px;
+    background: var(--white); border-right: 1px solid var(--gray-85); border-bottom: 1px solid var(--gray-85);
+    transform: rotate(45deg);
+  }
+  .cell-tooltip.show { display: block; }
+
+  /* ─────────────── Procore Uploads toast ─────────────── */
+  .uploads-toast {
+    position: fixed; right: 24px; bottom: 24px; width: 400px; max-width: 90vw;
+    background: var(--white); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
+    overflow: hidden; z-index: 400; display: none; flex-direction: column;
+  }
+  .uploads-toast.open { display: flex; }
+  .uploads-toast-header {
+    display: flex; align-items: center; gap: 8px; background: var(--gray-15); color: var(--white);
+    padding: 12px 16px; font-weight: 600; font-size: 15px;
+  }
+  .uploads-toast-header .mini-spin { border-color: var(--gray-40); border-top-color: var(--white); }
+  .uploads-toast-header .spacer { flex: 1; }
+  .uploads-toast-header button { background: transparent; border: none; color: var(--gray-70); display: flex; padding: 2px; }
+  .uploads-toast-header button:hover { color: var(--white); }
+  .uploads-toast-body { max-height: 340px; overflow-y: auto; padding: 12px; background: var(--gray-96); }
+  .uploads-toast.collapsed .uploads-toast-body { display: none; }
+  .toast-row {
+    display: flex; align-items: center; gap: 12px; background: var(--white); border: 1px solid var(--gray-90);
+    border-radius: var(--radius-md); padding: 12px; margin-bottom: 8px;
+  }
+  .toast-row:last-child { margin-bottom: 0; }
+  .toast-row .ficon { color: var(--red-50); flex-shrink: 0; }
+  .toast-row .tmeta { flex: 1; min-width: 0; }
+  .toast-row .tname { font-weight: 600; color: var(--gray-15); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .toast-row .tsub { font-size: 12px; color: var(--gray-50); display: flex; align-items: center; gap: 10px; margin-top: 6px; }
+  .toast-row .tbar { flex: 1; height: 4px; background: var(--gray-90); border-radius: 2px; overflow: hidden; max-width: 130px; }
+  .toast-row .tbar-fill { display: block; height: 100%; width: 0; background: var(--blue-40); transition: width .5s ease; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════ TOP NAV (shared chrome) ═══════════════ -->
+<nav class="topnav">
+  <div class="nav-home" title="Home">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M3 11.5 12 4l9 7.5" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 10v9h5v-5h4v5h5v-9" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </div>
+  <div class="nav-wordmark">PROCORE</div>
+  <div class="nav-select" title="Project selector">
+    <div class="label"><span class="top">Procore Builders</span><span class="bottom">Vortex Apartments</span></div>
+    <span class="chev">▾</span>
+  </div>
+  <div class="nav-select" title="Tool selector">
+    <div class="label"><span class="top">Project Tools</span><span class="bottom">Document Management</span></div>
+    <span class="chev">▾</span>
+  </div>
+  <div class="nav-search">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="m21 21-4.3-4.3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <input placeholder="Search Document Management" aria-label="Search Document Management">
+    <span class="nav-kbd"><span>Ctrl</span><span>K</span></span>
+  </div>
+  <div class="nav-item" title="Favorites">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.9 6.3 6.9.6-5.2 4.6 1.6 6.8L12 17.3 5.8 20.9l1.6-6.8L2.2 8.9l6.9-.6z"/></svg>
+    <div class="label"><span class="top">Favorites</span><span class="bottom">Transmittals</span></div>
+  </div>
+  <div class="nav-item" title="Apps">
+    <div class="label"><span class="top">Apps</span><span class="bottom">Select an App</span></div>
+    <span class="chev" style="color:var(--gray-70)">▾</span>
+  </div>
+  <div class="nav-icons">
+    <button class="nav-icon-btn" title="Help"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.8.4-1 .9-1 1.7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="16.5" r="1" fill="currentColor"/></svg></button>
+    <button class="nav-icon-btn" title="Messages"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 5h16v11H9l-4 3v-3H4z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg></button>
+    <button class="nav-icon-btn" title="Notifications"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M6 9a6 6 0 1 1 12 0c0 5 2 6 2 6H4s2-1 2-6z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M10 20a2 2 0 0 0 4 0" stroke="currentColor" stroke-width="2"/></svg></button>
+    <div class="nav-avatar">DC</div>
+  </div>
+</nav>
+
+<!-- ═══════════════ PAGE ═══════════════ -->
+<main class="page">
+  <header class="page-header">
+    <div class="page-header-top">
+      <div class="page-title">
+        <span class="gear"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M19.4 13a7.8 7.8 0 0 0 0-2l2-1.6-2-3.4-2.4 1a7.5 7.5 0 0 0-1.7-1l-.4-2.6h-4l-.4 2.6a7.5 7.5 0 0 0-1.7 1l-2.4-1-2 3.4 2 1.6a7.8 7.8 0 0 0 0 2l-2 1.6 2 3.4 2.4-1a7.5 7.5 0 0 0 1.7 1l.4 2.6h4l.4-2.6a7.5 7.5 0 0 0 1.7-1l2.4 1 2-3.4-2-1.6zM12 15a3 3 0 1 1 0-6 3 3 0 0 1 0 6z"/></svg></span>
+        <h1>Document Management</h1>
+      </div>
+      <div class="page-actions">
+        <button class="btn btn-secondary btn-split">Export <span class="chev">▾</span></button>
+        <button class="btn btn-secondary">Import Metadata</button>
+        <button class="btn btn-primary btn-split" id="addBtnHeader" onclick="toggleAddMenu(event, this)">Add <span class="chev">▾</span></button>
+      </div>
+    </div>
+    <nav class="tabs">
+      <div class="tab">Documents</div>
+      <div class="tab active">Uploads</div>
+      <div class="tab">Recycle Bin</div>
+    </nav>
+  </header>
+
+  <!-- ═══════════ SCREEN: Uploads (empty state) ═══════════ -->
+  <section class="screen active" id="screen-uploads">
+    <div class="content">
+      <!-- Left rail -->
+      <aside class="rail">
+        <div class="rail-header">Saved Views <span class="q"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.8.4-1 .9-1 1.7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="16.5" r="1" fill="currentColor"/></svg></span></div>
+        <div class="rail-group">
+          <div class="rail-group-header"><span>▾</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 3h8l4 4v14H6z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M14 3v4h4" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+            Document Uploads</div>
+          <div class="rail-item">All Document Uploads</div>
+          <div class="rail-item">Uploaded by Me</div>
+        </div>
+        <div class="rail-group">
+          <div class="rail-group-header"><span>▾</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="16" height="16" rx="2" stroke="currentColor" stroke-width="2" stroke-dasharray="3 3"/></svg>
+            Placeholders</div>
+          <div class="rail-item">All Placeholder Documents</div>
+          <div class="rail-item">Assigned to Me</div>
+          <div class="rail-item">Assigned to My Company</div>
+        </div>
+        <div class="rail-item active" style="margin-top:var(--sp-md)">All Uploads and Placeholders</div>
+      </aside>
+
+      <!-- Main panel -->
+      <div class="panel">
+        <div class="panel-header">
+          <button class="back-btn" title="Collapse"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M14 6l-6 6 6 6" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          <h2>All Uploads and Placeholders</h2>
+        </div>
+        <div class="panel-toolbar">
+          <div class="search-input">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="m21 21-4.3-4.3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            <input placeholder="Search" aria-label="Search uploads">
+          </div>
+          <button class="toolbar-btn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M3 5h18M6 12h12M10 19h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg> Filter</button>
+          <div class="toolbar-spacer"></div>
+          <button class="toolbar-btn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M4 7h10M18 7h2M4 17h2M10 17h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="16" cy="7" r="2" stroke="currentColor" stroke-width="2"/><circle cx="8" cy="17" r="2" stroke="currentColor" stroke-width="2"/></svg> Configure</button>
+        </div>
+
+        <div class="table-wrap">
+          <div id="emptyMode">
+          <table class="grid">
+            <thead>
+              <tr>
+                <th><div class="th-inner">Required Action</div></th>
+                <th><div class="th-inner">File <span class="th-menu">⋮</span></div></th>
+                <th><div class="th-inner">Name <span class="th-menu">⋮</span></div></th>
+                <th><div class="th-inner">Placeholder Assignee <span class="q"><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.8.4-1 .9-1 1.7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="16.5" r="1" fill="currentColor"/></svg></span> <span class="th-menu">⋮</span></div></th>
+                <th><div class="th-inner">Placeholder Due… <span class="q"><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.8.4-1 .9-1 1.7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="16.5" r="1" fill="currentColor"/></svg></span> <span class="th-menu">⋮</span></div></th>
+              </tr>
+            </thead>
+          </table>
+
+          <div class="empty-state">
+            <div class="empty-illus">
+              <svg width="180" height="150" viewBox="0 0 180 150" fill="none">
+                <rect x="34" y="30" width="120" height="90" rx="4" fill="var(--blue-40)"/>
+                <rect x="20" y="42" width="120" height="90" rx="4" fill="var(--gray-90)"/>
+                <rect x="26" y="48" width="108" height="78" rx="2" fill="var(--white)" stroke="var(--gray-15)" stroke-width="3"/>
+                <circle cx="33" cy="55" r="1.6" fill="var(--orange-50)"/>
+                <circle cx="39" cy="55" r="1.6" fill="var(--gray-50)"/>
+                <circle cx="45" cy="55" r="1.6" fill="var(--gray-50)"/>
+                <rect x="33" y="66" width="42" height="24" rx="2" fill="var(--gray-90)"/>
+                <rect x="82" y="66" width="45" height="10" rx="2" fill="var(--gray-90)"/>
+                <rect x="82" y="80" width="45" height="10" rx="2" fill="var(--gray-90)"/>
+                <rect x="33" y="98" width="94" height="8" rx="2" fill="var(--gray-90)"/>
+                <path d="M8 62l-4-3M10 74H4M12 86l-5 4" stroke="var(--gray-15)" stroke-width="2.5" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <h3>Add Documents or Placeholders to Get Started</h3>
+            <p>Document Management helps your team share and approve project files. Once your team uploads documents, you can view and edit them here.</p>
+            <button class="btn btn-primary btn-split" id="addBtnEmpty" onclick="toggleAddMenu(event, this)">Add <span class="chev">▾</span></button>
+          </div>
+          </div><!-- /#emptyMode -->
+
+          <!-- Populated uploads table (processing state) — injected by JS -->
+          <div id="tableMode" class="table-mode hidden"></div>
+
+          <div class="panel-footer">
+            <span><em>0 of 0</em></span>
+            <div class="footer-page">
+              <span>Page:</span>
+              <div class="footer-select">1 <span>▾</span></div>
+            </div>
+            <div class="footer-nav">
+              <button title="Previous"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M14 6l-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+              <button title="Next"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M10 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Future screens (upload → autodetect → uploads table with detection feedback) mount here -->
+
+</main>
+
+<!-- ═══════════════ Add dropdown menu (Screen 2) ═══════════════ -->
+<div class="menu" id="addMenu">
+  <div class="menu-label">Documents</div>
+  <div class="menu-item" onclick="onAddMenuSelect('upload-file')">Upload File</div>
+  <div class="menu-divider"></div>
+  <div class="menu-label">Placeholders</div>
+  <div class="menu-item" onclick="onAddMenuSelect('csv')">Create with .csv or .xlsx</div>
+  <div class="menu-item" onclick="onAddMenuSelect('manual')">Create Manually</div>
+</div>
+
+<!-- ═══════════════ Simulated macOS Finder open-dialog (Screen 3) ═══════════════ -->
+<div class="os-backdrop" id="finderBackdrop">
+  <div class="finder" role="dialog" aria-label="Open files">
+    <div class="finder-toolbar">
+      <div class="finder-navbtns">
+        <button disabled aria-label="Back">‹</button>
+        <button disabled aria-label="Forward">›</button>
+      </div>
+      <div class="finder-view">
+        <button aria-label="Icon view"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></button>
+        <button class="active" aria-label="List view"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+      </div>
+      <div class="finder-crumb"><svg width="15" height="15" viewBox="0 0 24 24" fill="#5ea9f0"><path d="M3 6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span class="name">Jack_s Sample Docume…</span><span>⌄</span></div>
+      <div class="finder-search"><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="m21 21-4.3-4.3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><input placeholder="Search"></div>
+    </div>
+    <div class="finder-body">
+      <div class="finder-sidebar">
+        <div class="finder-section">Favorites</div>
+        <div class="finder-sb-item"><svg class="ic" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#e0854b" stroke-width="2"/><path d="M12 7v5l3 2" stroke="#e0854b" stroke-width="2" stroke-linecap="round"/></svg> Recents</div>
+        <div class="finder-sb-item"><svg class="ic" viewBox="0 0 24 24" fill="#7aa7ff"><path d="M12 2l2 4 4-1-1 4 4 2-4 2 1 4-4-1-2 4-2-4-4 1 1-4-4-2 4-2-1-4 4 1z"/></svg> Applications</div>
+        <div class="finder-sb-item"><svg class="ic" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="12" rx="1.5" stroke="#5ea9f0" stroke-width="2"/><path d="M8 21h8" stroke="#5ea9f0" stroke-width="2" stroke-linecap="round"/></svg> Desktop</div>
+        <div class="finder-sb-item"><svg class="ic" viewBox="0 0 24 24" fill="#5ea9f0"><path d="M3 6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg> Documents</div>
+        <div class="finder-sb-item"><svg class="ic" viewBox="0 0 24 24" fill="none"><path d="M12 4v11m0 0l-4-4m4 4l4-4" stroke="#5ea9f0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 19h14" stroke="#5ea9f0" stroke-width="2" stroke-linecap="round"/></svg> Downloads</div>
+        <div class="finder-section">iCloud</div>
+        <div class="finder-sb-item"><svg class="ic" viewBox="0 0 24 24" fill="#5ea9f0"><path d="M7 18a4 4 0 0 1 0-8 5 5 0 0 1 9.6-1.5A3.5 3.5 0 0 1 17 18z"/></svg> iCloud Drive</div>
+        <div class="finder-sb-item"><svg class="ic" viewBox="0 0 24 24" fill="none"><rect x="3" y="6" width="18" height="13" rx="2" stroke="#5ea9f0" stroke-width="2"/><path d="M8 6V4h8v2" stroke="#5ea9f0" stroke-width="2"/></svg> Shared</div>
+        <div class="finder-section">Locations</div>
+        <div class="finder-sb-item"><svg class="ic" viewBox="0 0 24 24" fill="none"><path d="M6 15a4 4 0 0 1 .5-8 5 5 0 0 1 9.5-1 4 4 0 0 1 1.5 8" stroke="#9a9a9e" stroke-width="1.6"/><path d="M12 20l-2-3h4z" fill="#3fb950"/></svg> Google Drive</div>
+        <div class="finder-section">Tags</div>
+        <div class="finder-sb-item"><span class="tagdot" style="background:#ff5f57"></span> Red</div>
+        <div class="finder-sb-item"><span class="tagdot" style="background:#ff9f0a"></span> Orange</div>
+        <div class="finder-sb-item"><span class="tagdot" style="background:#ffd60a"></span> Yellow</div>
+      </div>
+      <div class="finder-main">
+        <div class="finder-colhead"><div>Name</div><div>Size</div><div>Kind</div><div>Date Added</div></div>
+        <div class="finder-list" id="finderList"><!-- rows injected by JS --></div>
+      </div>
+    </div>
+    <div class="finder-footer">
+      <button class="finder-btn spacer">Show Options</button>
+      <button class="finder-btn" onclick="closeFinder()">Cancel</button>
+      <button class="finder-btn primary" id="finderOpenBtn" onclick="confirmFinderOpen()">Open</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ Procore Uploads toast (Screen 4) ═══════════════ -->
+<div class="uploads-toast" id="uploadsToast">
+  <div class="uploads-toast-header">
+    <span>Uploads</span>
+    <span class="mini-spin" id="toastSpin"></span>
+    <span class="spacer"></span>
+    <button title="Collapse" onclick="toggleToastCollapse()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    <button title="Close" onclick="closeToast()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+  </div>
+  <div class="uploads-toast-body" id="uploadsToastBody"><!-- rows injected by JS --></div>
+</div>
+
+<!-- shared hover tooltip for loading metadata cells -->
+<div class="cell-tooltip" id="cellTooltip">Detecting from file…<br>Click to enter a value manually.</div>
+
+<script>
+  // ─────────── Add dropdown menu ───────────
+  const addMenu = document.getElementById('addMenu');
+  let addMenuAnchor = null;
+
+  function toggleAddMenu(e, anchor) {
+    e.stopPropagation();
+    if (addMenu.classList.contains('open') && addMenuAnchor === anchor) {
+      closeAddMenu();
+      return;
+    }
+    addMenuAnchor = anchor;
+    const r = anchor.getBoundingClientRect();
+    addMenu.style.top = (r.bottom + 6) + 'px';
+    // right-align the menu to the button
+    addMenu.classList.add('open');
+    const mw = addMenu.offsetWidth;
+    let left = r.right - mw;
+    if (left < 8) left = r.left;
+    addMenu.style.left = left + 'px';
+  }
+  function closeAddMenu() { addMenu.classList.remove('open'); addMenuAnchor = null; }
+
+  document.addEventListener('click', (e) => {
+    if (addMenu.classList.contains('open') && !addMenu.contains(e.target)) closeAddMenu();
+  });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeAddMenu(); });
+
+  function onAddMenuSelect(kind) {
+    closeAddMenu();
+    if (kind === 'upload-file') { openFinder(); return; }
+    console.log('Add menu select:', kind);
+  }
+
+  // ─────────── Screen router (for incremental multi-screen build) ───────────
+  function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.toggle('active', s.id === id));
+  }
+
+  // ─────────── Shared prototype state ───────────
+  // Demo dataset — exact filenames from the Figma flow. Varied naming
+  // conventions here will drive the metadata auto-detection story downstream.
+  const SAMPLE_FILES = [
+    { name: 'Dr-a-111-cO1-A.pdf',              size: '638 KB', kind: 'PDF Document', date: 'Oct 7, 2025 at 10:18' },
+    { name: 'DR-A-111-code1-A.pdf',            size: '638 KB', kind: 'PDF Document', date: 'Oct 7, 2025 at 9:33'  },
+    { name: 'DR-A-1990.pdf',                   size: '683 KB', kind: 'PDF Document', date: 'Jul 24, 2025 at 9:30' },
+    { name: 'A113_FIRST FLOOR…CEILING PLAN.pdf', size: '739 KB', kind: 'PDF Document', date: 'Jul 24, 2025 at 9:30' },
+    { name: 'A003_Life Safety Plans.pdf',      size: '1.2 MB', kind: 'PDF Document', date: 'Jul 24, 2025 at 9:30' },
+    { name: 'A111_FIRST FLOOR…ENSION PLAN.pdf',  size: '638 KB', kind: 'PDF Document', date: 'Jul 24, 2025 at 9:30' },
+  ];
+  const state = { selectedFiles: [] };
+
+  // ─────────── Finder open-dialog ───────────
+  const finderBackdrop = document.getElementById('finderBackdrop');
+  const finderList = document.getElementById('finderList');
+  const finderSelection = new Set();
+
+  function renderFinder() {
+    finderList.innerHTML = '';
+    SAMPLE_FILES.forEach((f, i) => {
+      const row = document.createElement('div');
+      row.className = 'finder-row' + (finderSelection.has(i) ? ' selected' : '');
+      row.innerHTML = `
+        <div class="fname">
+          <svg width="15" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 2h8l4 4v16H6z" fill="#e2574c"/><path d="M14 2v4h4" fill="#c1352b"/><text x="12" y="17" font-size="6" fill="#fff" text-anchor="middle" font-family="sans-serif" font-weight="700">PDF</text></svg>
+          <span class="label">${f.name}</span>
+          <svg class="icloud" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" opacity=".7"><path d="M7 18a4 4 0 0 1 0-8 5 5 0 0 1 9.6-1.5A3.5 3.5 0 0 1 17 18z"/></svg>
+        </div>
+        <div class="col">${f.size}</div>
+        <div class="col">${f.kind}</div>
+        <div class="col">${f.date}</div>`;
+      row.onclick = (e) => {
+        // click toggles selection (multi-select for the demo)
+        if (finderSelection.has(i)) finderSelection.delete(i); else finderSelection.add(i);
+        renderFinder();
+        e.stopPropagation();
+      };
+      finderList.appendChild(row);
+    });
+    const n = finderSelection.size;
+    const btn = document.getElementById('finderOpenBtn');
+    btn.disabled = n === 0;
+    btn.style.opacity = n === 0 ? '.5' : '1';
+  }
+
+  function openFinder() {
+    finderSelection.clear();
+    SAMPLE_FILES.forEach((_, i) => finderSelection.add(i)); // all pre-selected, per the flow
+    renderFinder();
+    finderBackdrop.classList.add('open');
+  }
+  function closeFinder() { finderBackdrop.classList.remove('open'); }
+
+  function confirmFinderOpen() {
+    if (finderSelection.size === 0) return;
+    state.selectedFiles = [...finderSelection].sort((a,b)=>a-b).map(i => SAMPLE_FILES[i]);
+    closeFinder();
+    startUpload();
+  }
+
+  // ─────────── Upload → populated processing table ───────────
+  // Fuller PDM metadata column set (the auto-detect / loading cells).
+  const META_COLS = ['Description', 'Type', 'Revision', 'Discipline', 'Originator', 'Classification'];
+  // 'Description' shows the column-options (⋮) affordance, per the mock.
+  const COLS_WITH_MENU = new Set(['Description']);
+  state.manualCells = {}; // "rowIdx|Field" -> true once user takes over (detection stopped)
+
+  const PDF_ICON = '<svg width="16" height="18" viewBox="0 0 24 24" fill="none"><path d="M6 2h8l4 4v16H6z" fill="#e2574c"/><path d="M14 2v4h4" fill="#c1352b"/><text x="12" y="17" font-size="6" fill="#fff" text-anchor="middle" font-family="sans-serif" font-weight="700">PDF</text></svg>';
+
+  function startUpload() {
+    // swap panel from empty-state to the populated table
+    document.getElementById('emptyMode').classList.add('hidden');
+    const tableMode = document.getElementById('tableMode');
+    tableMode.classList.remove('hidden');
+
+    // ── build table header ──
+    let thead = '<tr>' +
+      '<th class="col-check"><span class="checkbox" onclick="toggleAllRows(this)"></span></th>' +
+      '<th><div class="th-inner">Required Action</div></th>' +
+      '<th><div class="th-inner">File <span class="th-menu">⋮</span></div></th>' +
+      '<th><div class="th-inner">Name <span class="th-menu">⋮</span></div></th>';
+    META_COLS.forEach(c => {
+      thead += `<th><div class="th-inner">${c}${COLS_WITH_MENU.has(c) ? ' <span class="th-menu">⋮</span>' : ''}</div></th>`;
+    });
+    thead += '</tr>';
+
+    // ── build rows (one per selected file) ──
+    let tbody = '';
+    state.selectedFiles.forEach((f, i) => {
+      let cells = `
+        <td class="col-check"><span class="checkbox" onclick="toggleRow(this)"></span></td>
+        <td><span class="req-processing"><span class="mini-spin"></span> Processing</span></td>
+        <td><span class="file-cell"><a class="file-link" href="#" onclick="return false">${f.name}</a></span></td>
+        <td><span class="name-placeholder">—-—-—-—</span></td>`;
+      META_COLS.forEach(field => {
+        cells += `<td><div class="mcell" data-row="${i}" data-field="${field}" tabindex="0"><span class="mini-spin"></span></div></td>`;
+      });
+      tbody += `<tr>${cells}</tr>`;
+    });
+
+    tableMode.innerHTML = `<table class="uploads"><thead>${thead}</thead><tbody>${tbody}</tbody></table>`;
+
+    // wire loading-cell interactions
+    tableMode.querySelectorAll('.mcell').forEach(cell => {
+      cell.addEventListener('mouseenter', () => { if (!cell.classList.contains('manual')) showCellTooltip(cell); });
+      cell.addEventListener('mouseleave', hideCellTooltip);
+      cell.addEventListener('click', () => editCell(cell));
+      cell.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); editCell(cell); } });
+    });
+
+    // footer count reflects uploaded rows
+    const footerCount = document.querySelector('#screen-uploads .panel-footer em');
+    if (footerCount) footerCount.textContent = state.selectedFiles.length + ' of ' + state.selectedFiles.length;
+
+    // show the Uploads toast
+    showUploadsToast();
+  }
+
+  // ── loading-cell tooltip ──
+  const cellTooltip = document.getElementById('cellTooltip');
+  function showCellTooltip(cell) {
+    const r = cell.getBoundingClientRect();
+    cellTooltip.classList.add('show');
+    const th = cellTooltip.offsetHeight;
+    cellTooltip.style.left = r.left + 'px';
+    cellTooltip.style.top = (r.top - th - 10) + 'px';
+  }
+  function hideCellTooltip() { cellTooltip.classList.remove('show'); }
+
+  // ── click to edit → stops auto-detection for that cell ──
+  function editCell(cell) {
+    hideCellTooltip();
+    if (cell.classList.contains('manual')) { const inp = cell.querySelector('input'); if (inp) inp.focus(); return; }
+    const row = cell.dataset.row, field = cell.dataset.field;
+    state.manualCells[row + '|' + field] = true; // detection stopped for this cell (user_corrected)
+    cell.classList.add('manual', 'editing');
+    cell.innerHTML = '<input type="text" aria-label="' + field + '">';
+    const input = cell.querySelector('input');
+    input.focus();
+    input.addEventListener('blur', () => {
+      cell.classList.remove('editing');
+      if (input.value.trim()) cell.classList.add('filled'); else cell.classList.remove('filled');
+    });
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') input.blur(); });
+  }
+
+  // ── row selection ──
+  function toggleRow(el) { el.classList.toggle('checked'); }
+  function toggleAllRows(el) {
+    const on = !el.classList.contains('checked');
+    el.classList.toggle('checked', on);
+    document.querySelectorAll('#tableMode tbody .checkbox').forEach(cb => cb.classList.toggle('checked', on));
+  }
+
+  // ── Uploads toast ──
+  function showUploadsToast() {
+    const body = document.getElementById('uploadsToastBody');
+    body.innerHTML = '';
+    const fills = state.selectedFiles.map(f => {
+      const row = document.createElement('div');
+      row.className = 'toast-row';
+      row.innerHTML = `
+        <span class="ficon">${PDF_ICON}</span>
+        <div class="tmeta">
+          <div class="tname">${f.name}</div>
+          <div class="tsub"><span>${f.size}</span><span class="tbar"><span class="tbar-fill"></span></span></div>
+        </div>`;
+      body.appendChild(row);
+      return row.querySelector('.tbar-fill');
+    });
+    const toast = document.getElementById('uploadsToast');
+    toast.classList.remove('collapsed');
+    toast.classList.add('open');
+    // animate upload progress bars to complete (upload finishes; detection keeps running)
+    fills.forEach((fill, idx) => setTimeout(() => { fill.style.width = '100%'; }, 200 + idx * 160));
+  }
+  function toggleToastCollapse() { document.getElementById('uploadsToast').classList.toggle('collapsed'); }
+  function closeToast() { document.getElementById('uploadsToast').classList.remove('open'); }
+</script>
+</body>
+</html>
