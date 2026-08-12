@@ -456,7 +456,7 @@
   .mcell:hover { border-color: var(--gray-50); background: var(--gray-98); }
   .mcell.editing { border-color: var(--blue-40); box-shadow: 0 0 0 2px var(--blue-96); cursor: text; background: var(--white); }
   .mcell.filled { color: var(--gray-15); }
-  .mcell input {
+  .mcell input, .mcell select {
     border: none; outline: none; flex: 1; font-size: 14px; font-family: var(--font);
     background: transparent; color: var(--gray-15); width: 100%;
   }
@@ -478,6 +478,56 @@
     color: var(--orange-50); cursor: pointer;
   }
   .detect-badge:focus-visible { outline: 2px solid var(--blue-40); outline-offset: 1px; border-radius: var(--radius-sm); }
+
+  /* ── Not-detected (error) cell ──
+     A required field detection could not fill. The red-bordered control and the
+     red error circle are the data table's own required-field error state; the
+     amber triangle inside the control is what auto-detect adds on top, saying
+     why the field is empty. Two indicators, two different tooltips. */
+  table.uploads td.cell-error { background: #FDF7F7; }
+  table.uploads td.cell-error:hover { background: #FAE5E5; }
+  table.uploads tbody tr:hover td.cell-error { background: #FDF7F7; }
+  table.uploads tbody tr:hover td.cell-error:hover { background: #FAE5E5; }
+
+  .mcell.not-detected { border-color: transparent; background: transparent; cursor: pointer; }
+  .mcell.not-detected:hover { border-color: transparent; background: transparent; }
+  .err-field {
+    display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; height: 34px;
+    border: 1px solid var(--red-50); border-radius: var(--radius-md); padding: 0 10px;
+    background: var(--white);
+  }
+  .err-field .err-ph { flex: 1; min-width: 0; color: var(--gray-50); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .err-field .err-chev { color: var(--gray-40); flex-shrink: 0; font-size: 11px; }
+  .warn-badge, .err-badge {
+    display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+    padding: 0; border: none; background: none; cursor: pointer;
+  }
+  .err-badge { margin-left: 8px; }
+  .warn-badge:focus-visible, .err-badge:focus-visible {
+    outline: 2px solid var(--blue-40); outline-offset: 1px; border-radius: var(--radius-sm);
+  }
+
+  /* Required Action for a row still missing required fields */
+  .req-missing {
+    font-style: italic; color: var(--gray-40); cursor: default;
+    border-bottom: 1px dotted var(--gray-50); padding-bottom: 1px;
+  }
+
+  /* ── Dark tooltip (the data table's own error messaging) ── */
+  .dark-tooltip {
+    position: fixed; z-index: 630; display: none; pointer-events: none;
+    background: var(--gray-15); color: var(--white); border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg); padding: 10px 14px; font-size: 13px; line-height: 1.5;
+    max-width: 260px;
+  }
+  .dark-tooltip.show { display: block; }
+  .dark-tooltip ul { margin: 6px 0 0; padding-left: 18px; }
+  .dark-tooltip li { margin-top: 2px; }
+  .dark-tooltip .dt-tail {
+    position: absolute; bottom: -5px; width: 10px; height: 10px;
+    background: var(--gray-15); transform: rotate(45deg); display: none;
+  }
+  .dark-tooltip.with-tail .dt-tail { display: block; }
 
   /* Header text for metadata columns aligns with the value text inside .mcell,
      which sits one border + one padding step in from the cell edge. */
@@ -806,7 +856,13 @@
 <!-- shared hover tooltip for loading metadata cells -->
 <div class="cell-tooltip" id="cellTooltip">Detecting from file…<br>Click to enter a value manually.</div>
 
-<!-- shared hover tooltip for detected metadata cells (sparkle) -->
+<!-- data table's own error messaging (blank required field, missing attributes) -->
+<div class="dark-tooltip" id="darkTooltip" role="tooltip">
+  <div class="dt-body"></div>
+  <span class="dt-tail"></span>
+</div>
+
+<!-- shared hover tooltip for detected / not-detected metadata cells -->
 <div class="detect-tooltip" id="detectTooltip" role="tooltip">
   <h4>Detected</h4>
   <p class="review">Review the value for accuracy.</p>
@@ -997,9 +1053,9 @@
         'Type':           { value: 'Drawing',                        source: 'filename', at: 1200 },
         'Discipline':     { value: 'Architectural',                  source: 'filename', at: 1500 },
         'Revision':       { value: 'P02',                            source: 'ml',       at: 2400 },
-        'Description':    { value: 'North and East Elevations',      source: 'ml',       at: 3100 },
+        'Description':    { status: 'missing',                                           at: 3100 },
         'Originator':     { value: 'CGD',                            source: 'ml',       at: 3400 },
-        'Classification': { value: 'S2 - Suitable for Information',  source: 'ml',       at: 4200 },
+        'Classification': { status: 'missing',                                           at: 4200 },
       }
     },
     { // A113_FIRST FLOOR…CEILING PLAN.pdf — only the sheet number is parseable
@@ -1011,7 +1067,7 @@
         'Type':           { value: 'Drawing',                              source: 'ml',       at: 2600 },
         'Revision':       { value: 'P01',                                  source: 'ml',       at: 3300 },
         'Originator':     { value: 'CGD',                                  source: 'ml',       at: 4100 },
-        'Classification': { value: 'S3 - Suitable for Review and Comment', source: 'ml',       at: 4800 },
+        'Classification': { status: 'missing',                                                 at: 4800 },
       }
     },
     { // A003_Life Safety Plans.pdf
@@ -1019,17 +1075,17 @@
       fields: {
         'Discipline':     { value: 'Architectural',                 source: 'filename', at: 1650 },
         'Description':    { value: 'Life Safety Plans',             source: 'ml',       at: 1950 },
-        'Type':           { value: 'Drawing',                       source: 'ml',       at: 3000 },
+        'Type':           { status: 'missing',                                          at: 3000 },
         'Revision':       { value: 'C02',                           source: 'ml',       at: 3900 },
         'Originator':     { value: 'CGD',                           source: 'ml',       at: 4700 },
-        'Classification': { value: 'A1 - Authorized and Accepted',  source: 'ml',       at: 5600 },
+        'Classification': { status: 'missing',                                          at: 5600 },
       }
     },
     { // A111_FIRST FLOOR…ENSION PLAN.pdf
       name: [{ value: 'PN-CGD-DR-A-A111', at: 1950, final: true }],
       fields: {
         'Discipline':     { value: 'Architectural',                   source: 'filename', at: 1850 },
-        'Description':    { value: 'First Floor Dimension Plan',      source: 'ml',       at: 2200 },
+        'Description':    { status: 'missing',                                            at: 2200 },
         'Type':           { value: 'Drawing',                         source: 'ml',       at: 3400 },
         'Revision':       { value: 'P01',                             source: 'ml',       at: 4400 },
         'Originator':     { value: 'CGD',                             source: 'ml',       at: 5300 },
@@ -1043,6 +1099,38 @@
     ml:       'This value was detected and extracted from the file contents.',
   };
 
+  // Only required fields get the data table's red error treatment when
+  // detection comes up empty. `control` picks the placeholder and whether the
+  // field offers a dropdown when the user fills it in by hand.
+  const FIELD_CONFIG = {
+    'Description':    { required: true,  control: 'text',     placeholder: 'Enter text' },
+    'Type':           { required: true,  control: 'dropdown', placeholder: 'Select Type',
+                        options: ['DR - Drawing', 'M3 - 3D Model', 'SH - Schedule', 'SP - Specification', 'RP - Report'] },
+    'Revision':       { required: false, control: 'text',     placeholder: 'Enter text' },
+    'Discipline':     { required: false, control: 'dropdown', placeholder: 'Select Discipline',
+                        options: ['Architectural', 'Civil', 'Structural', 'Electrical', 'Mechanical'] },
+    'Originator':     { required: false, control: 'dropdown', placeholder: 'Select Originator',
+                        options: ['CGD', 'MEP', 'STR'] },
+    'Classification': { required: true,  control: 'dropdown', placeholder: 'Select Classification',
+                        options: ['S1 - Suitable for Coordination', 'S2 - Suitable for Information',
+                                  'S3 - Suitable for Review and Comment', 'S4 - Suitable for Stage Approval',
+                                  'A1 - Authorized and Accepted'] },
+  };
+
+  // Single message for now — the full set of reason codes is still to come.
+  const NOT_DETECTED_COPY = 'This value was not detected in the file name. Please enter a value manually.';
+  const BLANK_FIELD_COPY = 'This field cannot be blank.';
+
+  const WARN_ICON = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">' +
+    '<path d="M12.9 3.6a1 1 0 0 0-1.8 0L1.9 20.5a1 1 0 0 0 .9 1.5h18.4a1 1 0 0 0 .9-1.5L12.9 3.6z" fill="#E9A227"/>' +
+    '<path d="M12 9v4.4" stroke="#4A3200" stroke-width="2" stroke-linecap="round"/>' +
+    '<circle cx="12" cy="17.4" r="1.25" fill="#4A3200"/></svg>';
+
+  const ERROR_ICON = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">' +
+    '<circle cx="12" cy="12" r="10" fill="var(--red-50)"/>' +
+    '<path d="M12 6.8v6" stroke="#fff" stroke-width="2" stroke-linecap="round"/>' +
+    '<circle cx="12" cy="16.6" r="1.25" fill="#fff"/></svg>';
+
   function startUpload() {
     // a re-upload restarts the demo — drop any detection still in flight
     (state.timers || []).forEach(clearTimeout);
@@ -1050,6 +1138,7 @@
     state.manualCells = {};
     state.resolved = {};
     state.nameResolved = {};
+    state.missing = {};
 
     // swap panel from empty-state to the populated table
     document.getElementById('emptyMode').classList.add('hidden');
@@ -1086,13 +1175,14 @@
     // wire loading-cell interactions
     tableMode.querySelectorAll('.mcell').forEach(cell => {
       cell.addEventListener('mouseenter', () => {
-        if (!cell.classList.contains('manual') && !cell.classList.contains('detected')) showCellTooltip(cell);
+        if (!cell.classList.contains('manual') && !cell.classList.contains('detected')
+            && !cell.classList.contains('not-detected')) showCellTooltip(cell);
       });
       cell.addEventListener('mouseleave', hideCellTooltip);
-      // the sparkle is an info affordance, not an edit target — let it be
-      cell.addEventListener('click', (e) => { if (!e.target.closest('.detect-badge')) editCell(cell); });
+      // badges are info affordances, not edit targets — let them be
+      cell.addEventListener('click', (e) => { if (!e.target.closest(badgeSelector)) editCell(cell); });
       cell.addEventListener('keydown', (e) => {
-        if (e.target.closest('.detect-badge')) return;
+        if (e.target.closest(badgeSelector)) return;
         // keystrokes inside the editor are the editor's business: without this
         // the cell swallows the space bar and Enter re-opens an empty editor
         if (e.target.tagName === 'INPUT') return;
@@ -1100,22 +1190,25 @@
       });
     });
 
-    // sparkles are injected as detection lands, so delegate their hover/focus
-    tableMode.addEventListener('mouseover', (e) => {
-      const badge = e.target.closest('.detect-badge');
-      if (badge) showDetectTooltip(badge);
-    });
-    tableMode.addEventListener('mouseout', (e) => {
-      if (e.target.closest('.detect-badge')) hideDetectTooltip();
-    });
-    tableMode.addEventListener('focusin', (e) => {
-      const badge = e.target.closest('.detect-badge');
-      if (badge) showDetectTooltip(badge);
-    });
-    tableMode.addEventListener('focusout', (e) => {
-      if (e.target.closest('.detect-badge')) hideDetectTooltip();
-    });
-    tableMode.addEventListener('scroll', () => { hideCellTooltip(); hideDetectTooltip(); });
+    // badges are injected as detection lands, so delegate their hover/focus
+    const badgeTip = (target) => {
+      const spark = target.closest('.detect-badge');
+      if (spark) return showDetectTooltip(spark);
+      const warn = target.closest('.warn-badge');
+      if (warn) return showWarnTooltip(warn);
+      const err = target.closest('.err-badge');
+      if (err) return showDarkTooltip(err, BLANK_FIELD_COPY, false);
+      const missing = target.closest('.req-missing');
+      if (missing) return showMissingTooltip(missing);
+    };
+    const badgeSelector = '.detect-badge, .warn-badge, .err-badge, .req-missing';
+    const hideBadgeTips = () => { hideDetectTooltip(); hideDarkTooltip(); };
+
+    tableMode.addEventListener('mouseover', (e) => badgeTip(e.target));
+    tableMode.addEventListener('mouseout', (e) => { if (e.target.closest(badgeSelector)) hideBadgeTips(); });
+    tableMode.addEventListener('focusin', (e) => badgeTip(e.target));
+    tableMode.addEventListener('focusout', (e) => { if (e.target.closest(badgeSelector)) hideBadgeTips(); });
+    tableMode.addEventListener('scroll', () => { hideCellTooltip(); hideBadgeTips(); });
 
     // footer count reflects uploaded rows
     const footerCount = document.querySelector('#screen-uploads .panel-footer em');
@@ -1182,7 +1275,10 @@
       });
       Object.keys(plan.fields).forEach(field => {
         const d = plan.fields[field];
-        state.timers.push(setTimeout(() => applyDetection(i, field, d.value, d.source), d.at));
+        state.timers.push(setTimeout(() => {
+          if (d.status === 'missing') applyMissing(i, field);
+          else applyDetection(i, field, d.value, d.source);
+        }, d.at));
       });
     });
   }
@@ -1203,6 +1299,34 @@
     checkRowDone(row);
   }
 
+  // Detection came up empty. Required fields take the data table's error
+  // treatment plus the amber auto-detect warning; optional fields just sit
+  // blank, since nothing is wrong with an empty optional field.
+  function applyMissing(row, field) {
+    const cell = document.querySelector(`#tableMode .mcell[data-row="${row}"][data-field="${field}"]`);
+    if (!cell) return;
+    if (state.manualCells[row + '|' + field]) return;
+
+    const cfg = FIELD_CONFIG[field] || { control: 'text', placeholder: 'Enter text' };
+    cell.classList.add('not-detected');
+    cell.innerHTML =
+      `<span class="err-field">` +
+        `<span class="err-ph">${cfg.placeholder}</span>` +
+        `<button class="warn-badge" type="button" aria-label="Unable to detect — ${NOT_DETECTED_COPY}">${WARN_ICON}</button>` +
+        (cfg.control === 'dropdown' ? '<span class="err-chev">▾</span>' : '') +
+      `</span>` +
+      (cfg.required ? `<button class="err-badge" type="button" aria-label="${BLANK_FIELD_COPY}">${ERROR_ICON}</button>` : '');
+
+    const td = cell.closest('td');
+    if (td && cfg.required) td.classList.add('cell-error');
+
+    state.resolved[row + '|' + field] = true;
+    if (cfg.required) {
+      (state.missing[row] = state.missing[row] || new Set()).add(field);
+    }
+    checkRowDone(row);
+  }
+
   function applyName(row, value, final) {
     const td = document.querySelector(`#tableMode td[data-name="${row}"]`);
     if (!td) return;
@@ -1218,31 +1342,87 @@
     const allIn = META_COLS.every(f => state.resolved[row + '|' + f]);
     if (!allIn) return;
     const td = document.querySelector(`#tableMode td[data-req="${row}"]`);
-    if (!td || td.dataset.done === '1') return;
-    td.dataset.done = '1';
-    td.innerHTML = `<button class="req-submit" type="button">${CHECK_ICON} Submit</button>`;
-    scheduleStickyUpdate(); // Processing -> Submit changes the column width
+    if (!td) return;
+
+    const missing = state.missing[row];
+    const stillMissing = missing && missing.size > 0;
+    const next = stillMissing ? 'missing' : 'submit';
+    if (td.dataset.state === next) return;
+    td.dataset.state = next;
+
+    td.innerHTML = stillMissing
+      ? `<span class="req-missing" tabindex="0" data-missing-row="${row}">Missing Attributes</span>`
+      : `<button class="req-submit" type="button">${CHECK_ICON} Submit</button>`;
+    scheduleStickyUpdate(); // the Required Action column just changed width
   }
 
-  // ── provenance tooltip on the sparkle ──
+  // ── white info card: detection provenance, or why detection failed ──
   const detectTooltip = document.getElementById('detectTooltip');
-  document.getElementById('detectTooltipSpark').innerHTML = sparkle(16);
+
+  function showInfoTooltip(anchorEl, { title, review, icon, text }) {
+    hideCellTooltip();
+    hideDarkTooltip();
+    detectTooltip.querySelector('h4').textContent = title;
+    const reviewEl = detectTooltip.querySelector('.review');
+    reviewEl.textContent = review || '';
+    reviewEl.classList.toggle('hidden', !review);
+    document.getElementById('detectTooltipSpark').innerHTML = icon;
+    document.getElementById('detectTooltipText').textContent = text;
+    detectTooltip.classList.add('show');
+    positionAbove(detectTooltip, anchorEl, document.getElementById('detectTooltipTail'));
+  }
 
   function showDetectTooltip(badge) {
-    hideCellTooltip();
-    document.getElementById('detectTooltipText').textContent = SOURCE_COPY[badge.dataset.source] || '';
-    detectTooltip.classList.add('show');
-    const b = badge.getBoundingClientRect();
-    const tw = detectTooltip.offsetWidth, th = detectTooltip.offsetHeight;
-    const anchor = b.left + b.width / 2;
-    let left = anchor - tw / 2;
-    left = Math.max(8, Math.min(left, window.innerWidth - tw - 8));
-    detectTooltip.style.left = left + 'px';
-    detectTooltip.style.top = (b.top - th - 12) + 'px';
-    // tail tracks the sparkle even when the card is clamped to the viewport
-    document.getElementById('detectTooltipTail').style.left = (anchor - left - 6) + 'px';
+    showInfoTooltip(badge, {
+      title: 'Detected',
+      review: 'Review the value for accuracy.',
+      icon: sparkle(16),
+      text: SOURCE_COPY[badge.dataset.source] || '',
+    });
   }
+
+  function showWarnTooltip(badge) {
+    showInfoTooltip(badge, {
+      title: 'Unable to Detect',
+      review: '',
+      icon: WARN_ICON,
+      text: NOT_DETECTED_COPY,
+    });
+  }
+
   function hideDetectTooltip() { detectTooltip.classList.remove('show'); }
+
+  // ── dark tooltip: the data table's own error messaging ──
+  const darkTooltip = document.getElementById('darkTooltip');
+
+  function showDarkTooltip(anchorEl, html, withTail) {
+    hideCellTooltip();
+    hideDetectTooltip();
+    darkTooltip.querySelector('.dt-body').innerHTML = html;
+    darkTooltip.classList.toggle('with-tail', !!withTail);
+    darkTooltip.classList.add('show');
+    positionAbove(darkTooltip, anchorEl, withTail ? darkTooltip.querySelector('.dt-tail') : null);
+  }
+  function hideDarkTooltip() { darkTooltip.classList.remove('show'); }
+
+  function showMissingTooltip(el) {
+    const fields = [...(state.missing[el.dataset.missingRow] || [])];
+    showDarkTooltip(el,
+      'Some required fields are still missing. Please fill in the missing fields:' +
+      '<ul>' + fields.map(f => `<li>${f}</li>`).join('') + '</ul>', true);
+  }
+
+  // Shared placement: centred above the anchor, clamped to the viewport, with
+  // the tail (when there is one) still pointing at the anchor after clamping.
+  function positionAbove(tip, anchorEl, tailEl) {
+    const b = anchorEl.getBoundingClientRect();
+    const tw = tip.offsetWidth, th = tip.offsetHeight;
+    const anchor = b.left + b.width / 2;
+    let left = Math.max(8, Math.min(anchor - tw / 2, window.innerWidth - tw - 8));
+    tip.style.left = left + 'px';
+    tip.style.top = (b.top - th - 12) + 'px';
+    if (tailEl) tailEl.style.left = (anchor - left - 5) + 'px';
+  }
 
   // ── loading-cell tooltip ──
   const cellTooltip = document.getElementById('cellTooltip');
@@ -1259,29 +1439,44 @@
   // On a still-loading cell this stops auto-detection for that cell. On an
   // already-detected cell it seeds the input with the detected value; the
   // sparkle only goes away if the user actually changes it (user_corrected).
+  // A not-detected cell opens the same way, and filling it clears the row's
+  // missing-field error.
   function editCell(cell) {
     hideCellTooltip();
     hideDetectTooltip();
-    if (cell.classList.contains('editing')) { const inp = cell.querySelector('input'); if (inp) inp.focus(); return; }
+    hideDarkTooltip();
+    if (cell.classList.contains('editing')) {
+      const inp = cell.querySelector('input, select');
+      if (inp) inp.focus();
+      return;
+    }
 
     const row = cell.dataset.row, field = cell.dataset.field;
+    const cfg = FIELD_CONFIG[field] || { control: 'text' };
     const wasDetected = cell.classList.contains('detected');
+    const wasMissing = cell.classList.contains('not-detected');
     const valueEl = wasDetected ? cell.querySelector('.mval') : null;
     const badgeEl = wasDetected ? cell.querySelector('.detect-badge') : null;
     const prevValue = valueEl ? valueEl.textContent : '';
     const prevSource = badgeEl ? badgeEl.dataset.source : '';
 
     if (!wasDetected) state.manualCells[row + '|' + field] = true; // detection stopped for this cell
-    cell.classList.remove('detected');
+    cell.classList.remove('detected', 'not-detected');
     cell.classList.add('manual', 'editing');
-    cell.innerHTML = '<input type="text" aria-label="' + field + '">';
 
-    const input = cell.querySelector('input');
+    // a dropdown field offers its options rather than a free-text box
+    const useSelect = cfg.control === 'dropdown' && cfg.options;
+    cell.innerHTML = useSelect
+      ? `<select aria-label="${field}"><option value=""></option>` +
+        cfg.options.map(o => `<option>${o}</option>`).join('') + '</select>'
+      : `<input type="text" aria-label="${field}">`;
+
+    const input = cell.querySelector('input, select');
     input.value = prevValue;
     input.focus();
-    input.select();
+    if (input.select) input.select();
 
-    input.addEventListener('blur', () => {
+    const commit = () => {
       cell.classList.remove('editing');
       const val = input.value.trim();
 
@@ -1295,6 +1490,20 @@
 
       state.manualCells[row + '|' + field] = true;
       state.resolved[row + '|' + field] = true;
+
+      if (val) {
+        // the field is no longer blank, so the row's error clears with it
+        const td = cell.closest('td');
+        if (td) td.classList.remove('cell-error');
+        if (state.missing[row]) state.missing[row].delete(field);
+      } else if (wasMissing) {
+        // left blank — restore the error treatment rather than an empty cell
+        cell.classList.remove('manual', 'filled');
+        state.manualCells[row + '|' + field] = false; // must clear before applyMissing, which respects it
+        applyMissing(row, field);
+        return;
+      }
+
       cell.classList.toggle('filled', !!val);
       cell.textContent = '';
       const span = document.createElement('span');
@@ -1302,8 +1511,11 @@
       span.textContent = val; // user input — never through innerHTML
       cell.appendChild(span);
       checkRowDone(row);
-    });
+    };
+
+    input.addEventListener('blur', commit);
     input.addEventListener('keydown', (e) => { if (e.key === 'Enter') input.blur(); });
+    if (useSelect) input.addEventListener('change', () => input.blur());
   }
 
   // ── row selection ──
