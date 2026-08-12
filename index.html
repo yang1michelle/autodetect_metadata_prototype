@@ -432,6 +432,7 @@
     box-shadow: 6px 0 8px -5px rgba(0, 0, 0, .18);
   }
   .req-processing { display: inline-flex; align-items: center; gap: 8px; color: var(--gray-40); font-style: italic; }
+  .delay-badge { margin-left: 8px; vertical-align: middle; }
   .mini-spin {
     width: 15px; height: 15px; border: 2px solid var(--gray-85); border-top-color: var(--gray-40);
     border-radius: 50%; animation: spin .8s linear infinite; display: inline-block; flex-shrink: 0;
@@ -1020,7 +1021,7 @@
     { // Dr-a-111-cO1-A.pdf — inconsistent casing, and the revision segment is
       // written with a letter O rather than a zero, so the filename parser
       // misses it and the ML pass recovers it from the title block instead.
-      name: [{ value: 'PN-CGD-DR-A-A111', at: 1200, final: true }],
+      name: [{ value: 'PN-CGD-DR-A-A111', source: 'filename', at: 1200, final: true }],
       fields: {
         'Type':           { value: 'Drawing',                          source: 'filename', at: 900  },
         'Discipline':     { value: 'Architectural',                    source: 'filename', at: 1100 },
@@ -1032,7 +1033,7 @@
     },
     { // DR-A-111-code1-A.pdf — same sheet as above, uploaded a second time with
       // a cleaner name, so the revision does come off the filename here.
-      name: [{ value: 'PN-CGD-DR-A-A111', at: 1350, final: true }],
+      name: [{ value: 'PN-CGD-DR-A-A111', source: 'filename', at: 1350, final: true }],
       fields: {
         'Type':           { value: 'Drawing',                          source: 'filename', at: 1000 },
         'Discipline':     { value: 'Architectural',                    source: 'filename', at: 1250 },
@@ -1046,8 +1047,8 @@
       // container ID lands incomplete first and fills in once ML resolves the
       // originator from the title block.
       name: [
-        { value: 'PN-__-DR-A-1990',  at: 1400, final: false },
-        { value: 'PN-CGD-DR-A-1990', at: 3400, final: true  },
+        { value: 'PN-__-DR-A-1990',  source: 'filename', at: 1400, final: false },
+        { value: 'PN-CGD-DR-A-1990', source: 'ml',       at: 3400, final: true  },
       ],
       fields: {
         'Type':           { value: 'Drawing',                        source: 'filename', at: 1200 },
@@ -1060,7 +1061,7 @@
     },
     { // A113_FIRST FLOOR…CEILING PLAN.pdf — only the sheet number is parseable
       // from the filename; everything else comes from the title block.
-      name: [{ value: 'PN-CGD-DR-A-A113', at: 1550, final: true }],
+      name: [{ value: 'PN-CGD-DR-A-A113', source: 'filename', at: 1550, final: true }],
       fields: {
         'Discipline':     { value: 'Architectural',                        source: 'filename', at: 1450 },
         'Description':    { value: 'First Floor Reflected Ceiling Plan',   source: 'ml',       at: 1700 },
@@ -1071,7 +1072,7 @@
       }
     },
     { // A003_Life Safety Plans.pdf
-      name: [{ value: 'PN-CGD-DR-A-A003', at: 1750, final: true }],
+      name: [{ value: 'PN-CGD-DR-A-A003', source: 'filename', at: 1750, final: true }],
       fields: {
         'Discipline':     { value: 'Architectural',                 source: 'filename', at: 1650 },
         'Description':    { value: 'Life Safety Plans',             source: 'ml',       at: 1950 },
@@ -1082,7 +1083,7 @@
       }
     },
     { // A111_FIRST FLOOR…ENSION PLAN.pdf
-      name: [{ value: 'PN-CGD-DR-A-A111', at: 1950, final: true }],
+      name: [{ value: 'PN-CGD-DR-A-A111', source: 'filename', at: 1950, final: true }],
       fields: {
         'Discipline':     { value: 'Architectural',                   source: 'filename', at: 1850 },
         'Description':    { status: 'missing',                                            at: 2200 },
@@ -1129,6 +1130,14 @@
   };
   const DEFAULT_REASON = 'not_in_filename';
   const BLANK_FIELD_COPY = 'This field cannot be blank.';
+  const DELAYED_COPY = 'The process is taking longer than expected. You can wait or enter the information manually.';
+
+  // Scenario switch, so the ML-down path can be demoed without adding chrome
+  // that is not in the designs: index.html?scenario=ml-down
+  const SCENARIO = new URLSearchParams(location.search).get('scenario') || 'default';
+  const ML_DOWN = SCENARIO === 'ml-down';
+  // how long a row sits in Processing before it admits detection is stuck
+  const DELAY_THRESHOLD = 6000;
 
   const WARN_ICON = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">' +
     '<path d="M12.9 3.6a1 1 0 0 0-1.8 0L1.9 20.5a1 1 0 0 0 .9 1.5h18.4a1 1 0 0 0 .9-1.5L12.9 3.6z" fill="#E9A227"/>' +
@@ -1203,6 +1212,8 @@
     const badgeTip = (target) => {
       const spark = target.closest('.detect-badge');
       if (spark) return showDetectTooltip(spark);
+      const delayed = target.closest('.delay-badge');
+      if (delayed) return showDelayedTooltip(delayed);
       const warn = target.closest('.warn-badge');
       if (warn) return showWarnTooltip(warn);
       const err = target.closest('.err-badge');
@@ -1210,7 +1221,7 @@
       const missing = target.closest('.req-missing');
       if (missing) return showMissingTooltip(missing);
     };
-    const badgeSelector = '.detect-badge, .warn-badge, .err-badge, .req-missing';
+    const badgeSelector = '.detect-badge, .warn-badge, .err-badge, .req-missing, .delay-badge';
     const hideBadgeTips = () => { hideDetectTooltip(); hideDarkTooltip(); };
 
     tableMode.addEventListener('mouseover', (e) => badgeTip(e.target));
@@ -1279,9 +1290,17 @@
     state.selectedFiles.forEach((f, i) => {
       const plan = DETECTION[f.srcIndex];
       if (!plan) return;
+
+      // With the ML service down the pipeline stalls at the detection step, so
+      // nothing downstream is emitted — including values the filename parser
+      // already read. Only the container ID the parser writes straight to the
+      // row survives; anything waiting on ML never arrives.
       plan.name.forEach(step => {
+        if (ML_DOWN && step.source === 'ml') return;
         state.timers.push(setTimeout(() => applyName(i, step.value, step.final), step.at));
       });
+      if (ML_DOWN) return;
+
       Object.keys(plan.fields).forEach(field => {
         const d = plan.fields[field];
         state.timers.push(setTimeout(() => {
@@ -1290,6 +1309,23 @@
         }, d.at));
       });
     });
+
+    // rows still spinning after the threshold say so rather than spinning mutely
+    if (ML_DOWN) {
+      state.timers.push(setTimeout(markDetectionDelayed, DELAY_THRESHOLD));
+    }
+  }
+
+  // Annotated on the ML Down frame: a warning icon sits beside the Processing
+  // label, and hovering it explains that detection is stuck and offers the
+  // manual route out.
+  function markDetectionDelayed() {
+    document.querySelectorAll('#tableMode td[data-req] .req-processing').forEach(el => {
+      if (el.parentElement.querySelector('.delay-badge')) return;
+      el.insertAdjacentHTML('afterend',
+        `<button class="warn-badge delay-badge" type="button" aria-label="Detection delayed — ${DELAYED_COPY}">${WARN_ICON}</button>`);
+    });
+    scheduleStickyUpdate(); // the Required Action column just got wider
   }
 
   function badgeHtml(source) {
@@ -1390,6 +1426,15 @@
       review: 'Review the value for accuracy.',
       icon: sparkle(16),
       text: SOURCE_COPY[badge.dataset.source] || '',
+    });
+  }
+
+  function showDelayedTooltip(badge) {
+    showInfoTooltip(badge, {
+      title: 'Detection Delayed',
+      review: '',
+      icon: WARN_ICON,
+      text: DELAYED_COPY,
     });
   }
 

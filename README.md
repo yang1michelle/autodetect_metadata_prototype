@@ -34,5 +34,18 @@ then visit http://localhost:8000
    flips from *Processing* to a **Submit** button.
 8. Editing a detected value removes its sparkle (the value is now
    user-corrected); leaving it untouched restores it.
-9. The **Uploads toast** (bottom right) tracks upload progress and can be
-   collapsed or dismissed.
+9. Fields that fail take an error state — a red-bordered control with an amber
+   warning explaining why detection failed, alongside the data table's own
+   required-field error. Required Action becomes **Missing Attributes**, listing
+   the missing fields on hover.
+10. The **Uploads toast** (bottom right) tracks upload progress and can be
+    collapsed or dismissed.
+
+## Scenarios
+
+Append a `scenario` parameter to demo a failure mode:
+
+| URL | Shows |
+| --- | --- |
+| `index.html` | The normal run — a mix of detected and not-detected fields |
+| `index.html?scenario=ml-down` | The ML service unresponsive: rows stay in *Processing*, and after 6s each one shows a **Detection Delayed** warning |
