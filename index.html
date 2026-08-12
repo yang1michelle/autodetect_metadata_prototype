@@ -843,6 +843,15 @@
   ];
   const state = { selectedFiles: [] };
 
+  // PDF file icon, from the design system. Single source for every place the
+  // icon appears — Finder rows and the uploads toast; `s` sets the rendered size.
+  const pdfIcon = (s) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" aria-hidden="true">` +
+    '<path fill-rule="evenodd" clip-rule="evenodd" d="M3 0H15L21 6V24H3V0Z" fill="#E05252"/>' +
+    '<path fill-rule="evenodd" clip-rule="evenodd" d="M15 0L21 6H15V0Z" fill="#F3BEBE"/>' +
+    '<path fill-rule="evenodd" clip-rule="evenodd" d="M15 6L21 12V6H15Z" fill="#AD1F1F"/>' +
+    '<path d="M19 20H5V18H19V20ZM11 16H5V10H11V16ZM19 16H13V14H19V16ZM19 12H13V10H19V12Z" fill="#570F0F"/>' +
+    '</svg>';
+
   // ─────────── Finder open-dialog ───────────
   const finderBackdrop = document.getElementById('finderBackdrop');
   const finderList = document.getElementById('finderList');
@@ -855,7 +864,7 @@
       row.className = 'finder-row' + (finderSelection.has(i) ? ' selected' : '');
       row.innerHTML = `
         <div class="fname">
-          <svg width="15" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 2h8l4 4v16H6z" fill="#e2574c"/><path d="M14 2v4h4" fill="#c1352b"/><text x="12" y="17" font-size="6" fill="#fff" text-anchor="middle" font-family="sans-serif" font-weight="700">PDF</text></svg>
+          ${pdfIcon(15)}
           <span class="label">${f.name}</span>
           <svg class="icloud" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" opacity=".7"><path d="M7 18a4 4 0 0 1 0-8 5 5 0 0 1 9.6-1.5A3.5 3.5 0 0 1 17 18z"/></svg>
         </div>
@@ -900,7 +909,7 @@
   const COLS_WITH_MENU = new Set(['Description']);
   state.manualCells = {}; // "rowIdx|Field" -> true once user takes over (detection stopped)
 
-  const PDF_ICON = '<svg width="16" height="18" viewBox="0 0 24 24" fill="none"><path d="M6 2h8l4 4v16H6z" fill="#e2574c"/><path d="M14 2v4h4" fill="#c1352b"/><text x="12" y="17" font-size="6" fill="#fff" text-anchor="middle" font-family="sans-serif" font-weight="700">PDF</text></svg>';
+  const PDF_ICON = pdfIcon(18);
 
   // Four-point auto-detect sparkle. Sized by the `s` argument so the same mark
   // works in a table cell and inside the tooltip body.
