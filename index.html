@@ -1067,7 +1067,7 @@
         'Type':           { value: 'Drawing',                              source: 'ml',       at: 2600 },
         'Revision':       { value: 'P01',                                  source: 'ml',       at: 3300 },
         'Originator':     { value: 'CGD',                                  source: 'ml',       at: 4100 },
-        'Classification': { status: 'missing',                                                 at: 4800 },
+        'Classification': { status: 'missing', reason: 'invalid_or_inactive',                   at: 4800 },
       }
     },
     { // A003_Life Safety Plans.pdf
@@ -1075,7 +1075,7 @@
       fields: {
         'Discipline':     { value: 'Architectural',                 source: 'filename', at: 1650 },
         'Description':    { value: 'Life Safety Plans',             source: 'ml',       at: 1950 },
-        'Type':           { status: 'missing',                                          at: 3000 },
+        'Type':           { status: 'missing', reason: 'invalid_or_inactive',           at: 3000 },
         'Revision':       { value: 'C02',                           source: 'ml',       at: 3900 },
         'Originator':     { value: 'CGD',                           source: 'ml',       at: 4700 },
         'Classification': { status: 'missing',                                          at: 5600 },
@@ -1117,8 +1117,17 @@
                                   'A1 - Authorized and Accepted'] },
   };
 
-  // Single message for now — the full set of reason codes is still to come.
-  const NOT_DETECTED_COPY = 'This value was not detected in the file name. Please enter a value manually.';
+  // Why a field came back empty. A plan entry names one of these; the code
+  // decides the tooltip copy, and is what the backend would log as
+  // failure_reason. More reason codes to come.
+  const NOT_DETECTED_REASONS = {
+    // nothing to detect — the filename carried no such segment
+    not_in_filename:     'This value was not detected in the file name. Please enter a value manually.',
+    // dropdown fields: a value was detected, but it is not a selectable option
+    // here — either absent from the system or present but deactivated
+    invalid_or_inactive: 'This value is invalid or inactive. Please select a valid option.',
+  };
+  const DEFAULT_REASON = 'not_in_filename';
   const BLANK_FIELD_COPY = 'This field cannot be blank.';
 
   const WARN_ICON = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">' +
@@ -1276,7 +1285,7 @@
       Object.keys(plan.fields).forEach(field => {
         const d = plan.fields[field];
         state.timers.push(setTimeout(() => {
-          if (d.status === 'missing') applyMissing(i, field);
+          if (d.status === 'missing') applyMissing(i, field, d.reason);
           else applyDetection(i, field, d.value, d.source);
         }, d.at));
       });
@@ -1302,17 +1311,20 @@
   // Detection came up empty. Required fields take the data table's error
   // treatment plus the amber auto-detect warning; optional fields just sit
   // blank, since nothing is wrong with an empty optional field.
-  function applyMissing(row, field) {
+  function applyMissing(row, field, reason) {
     const cell = document.querySelector(`#tableMode .mcell[data-row="${row}"][data-field="${field}"]`);
     if (!cell) return;
     if (state.manualCells[row + '|' + field]) return;
 
     const cfg = FIELD_CONFIG[field] || { control: 'text', placeholder: 'Enter text' };
+    const code = NOT_DETECTED_REASONS[reason] ? reason : DEFAULT_REASON;
+    cell.dataset.reason = code; // survives an edit that gets abandoned
     cell.classList.add('not-detected');
     cell.innerHTML =
       `<span class="err-field">` +
         `<span class="err-ph">${cfg.placeholder}</span>` +
-        `<button class="warn-badge" type="button" aria-label="Unable to detect — ${NOT_DETECTED_COPY}">${WARN_ICON}</button>` +
+        `<button class="warn-badge" type="button" data-reason="${code}"` +
+        ` aria-label="Unable to detect — ${NOT_DETECTED_REASONS[code]}">${WARN_ICON}</button>` +
         (cfg.control === 'dropdown' ? '<span class="err-chev">▾</span>' : '') +
       `</span>` +
       (cfg.required ? `<button class="err-badge" type="button" aria-label="${BLANK_FIELD_COPY}">${ERROR_ICON}</button>` : '');
@@ -1386,7 +1398,7 @@
       title: 'Unable to Detect',
       review: '',
       icon: WARN_ICON,
-      text: NOT_DETECTED_COPY,
+      text: NOT_DETECTED_REASONS[badge.dataset.reason] || NOT_DETECTED_REASONS[DEFAULT_REASON],
     });
   }
 
@@ -1500,7 +1512,7 @@
         // left blank — restore the error treatment rather than an empty cell
         cell.classList.remove('manual', 'filled');
         state.manualCells[row + '|' + field] = false; // must clear before applyMissing, which respects it
-        applyMissing(row, field);
+        applyMissing(row, field, cell.dataset.reason);
         return;
       }
 
