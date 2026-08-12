@@ -445,6 +445,56 @@
     border: none; outline: none; flex: 1; font-size: 14px; font-family: var(--font);
     background: transparent; color: var(--gray-15); width: 100%;
   }
+  .mcell .mval { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* Detected (success) state — the input chrome drops away and the value reads
+     as plain text with the auto-detect sparkle pinned to the right of the cell.
+     Manually entered values look the same, minus the sparkle. */
+  .mcell.detected,
+  .mcell.manual.filled:not(.editing) {
+    border-color: transparent; background: transparent; color: var(--gray-15);
+  }
+  .mcell.detected:hover,
+  .mcell.manual.filled:not(.editing):hover { border-color: transparent; background: transparent; }
+
+  .detect-badge {
+    display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+    margin-left: 8px; padding: 2px; border: none; background: none;
+    color: var(--orange-50); cursor: pointer;
+  }
+  .detect-badge:focus-visible { outline: 2px solid var(--blue-40); outline-offset: 1px; border-radius: var(--radius-sm); }
+
+  /* Header text for metadata columns aligns with the value text inside .mcell,
+     which sits one border + one padding step in from the cell edge. */
+  table.uploads thead th.th-meta { padding-left: 27px; }
+
+  /* Required Action — row is fully detected and ready to submit */
+  .req-submit {
+    display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px;
+    background: var(--gray-96); border: 1px solid var(--gray-90); border-radius: var(--radius-md);
+    font-size: 13px; font-weight: 600; color: var(--gray-20);
+  }
+  .req-submit:hover { background: var(--gray-90); }
+
+  /* ─────────────── Auto-detect provenance tooltip ─────────────── */
+  .detect-tooltip {
+    position: fixed; z-index: 620; width: 268px; display: none; pointer-events: none;
+    background: var(--white); border: 1px solid var(--gray-90); border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg); padding: 16px 18px;
+  }
+  .detect-tooltip.show { display: block; }
+  .detect-tooltip h4 { font-size: 16px; font-weight: 700; color: var(--gray-15); margin-bottom: 6px; }
+  .detect-tooltip .review { font-style: italic; font-size: 13px; color: var(--gray-20); margin-bottom: 12px; }
+  .detect-tooltip .reason {
+    display: flex; align-items: flex-start; gap: 10px;
+    font-size: 13px; line-height: 1.5; color: var(--gray-20);
+  }
+  .detect-tooltip .reason .spark { color: var(--orange-50); flex-shrink: 0; margin-top: 1px; }
+  .detect-tooltip .tail {
+    position: absolute; bottom: -7px; width: 12px; height: 12px; background: var(--white);
+    border-right: 1px solid var(--gray-90); border-bottom: 1px solid var(--gray-90);
+    transform: rotate(45deg);
+  }
 
   /* shared hover tooltip for loading cells */
   .cell-tooltip {
@@ -717,6 +767,17 @@
 <!-- shared hover tooltip for loading metadata cells -->
 <div class="cell-tooltip" id="cellTooltip">Detecting from file…<br>Click to enter a value manually.</div>
 
+<!-- shared hover tooltip for detected metadata cells (sparkle) -->
+<div class="detect-tooltip" id="detectTooltip" role="tooltip">
+  <h4>Detected</h4>
+  <p class="review">Review the value for accuracy.</p>
+  <div class="reason">
+    <span class="spark" id="detectTooltipSpark"></span>
+    <span class="reason-text" id="detectTooltipText"></span>
+  </div>
+  <span class="tail" id="detectTooltipTail"></span>
+</div>
+
 <script>
   // ─────────── Add dropdown menu ───────────
   const addMenu = document.getElementById('addMenu');
@@ -812,7 +873,9 @@
 
   function confirmFinderOpen() {
     if (finderSelection.size === 0) return;
-    state.selectedFiles = [...finderSelection].sort((a,b)=>a-b).map(i => SAMPLE_FILES[i]);
+    // keep the SAMPLE_FILES index so each row can find its detection plan
+    state.selectedFiles = [...finderSelection].sort((a,b)=>a-b)
+      .map(i => Object.assign({}, SAMPLE_FILES[i], { srcIndex: i }));
     closeFinder();
     startUpload();
   }
@@ -826,7 +889,112 @@
 
   const PDF_ICON = '<svg width="16" height="18" viewBox="0 0 24 24" fill="none"><path d="M6 2h8l4 4v16H6z" fill="#e2574c"/><path d="M14 2v4h4" fill="#c1352b"/><text x="12" y="17" font-size="6" fill="#fff" text-anchor="middle" font-family="sans-serif" font-weight="700">PDF</text></svg>';
 
+  // Four-point auto-detect sparkle. Sized by the `s` argument so the same mark
+  // works in a table cell and inside the tooltip body.
+  const sparkle = (s) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 1.6c.5 5.2 2.6 8.3 10.4 10.4-7.8 2.1-9.9 5.2-10.4 10.4-.5-5.2-2.6-8.3-10.4-10.4C9.4 9.9 11.5 6.8 12 1.6z"/></svg>`;
+
+  const CHECK_ICON = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+  // ─────────── Detection plans ───────────
+  // One plan per file in SAMPLE_FILES, matched by index. `source` decides which
+  // hover tooltip the sparkle shows:
+  //   'filename' → the value was parsed out of the information container ID
+  //   'ml'       → the value was read out of the drawing's title block
+  // Metadata follows ISO 19650: container IDs are
+  // [Project]-[Originator]-[Type]-[Discipline]-[Number], revisions use the
+  // P__ (preliminary) / C__ (contractual) sequence, and Classification carries
+  // the suitability code the container was issued under.
+  const DETECTION = [
+    { // Dr-a-111-cO1-A.pdf — inconsistent casing, and the revision segment is
+      // written with a letter O rather than a zero, so the filename parser
+      // misses it and the ML pass recovers it from the title block instead.
+      name: [{ value: 'PN-CGD-DR-A-A111', at: 1200, final: true }],
+      fields: {
+        'Type':           { value: 'Drawing',                          source: 'filename', at: 900  },
+        'Discipline':     { value: 'Architectural',                    source: 'filename', at: 1100 },
+        'Revision':       { value: 'C01',                              source: 'ml',       at: 1500 },
+        'Originator':     { value: 'CGD',                              source: 'ml',       at: 1800 },
+        'Description':    { value: 'First Floor Dimension Plan',       source: 'ml',       at: 2100 },
+        'Classification': { value: 'S4 - Suitable for Stage Approval', source: 'ml',       at: 2400 },
+      }
+    },
+    { // DR-A-111-code1-A.pdf — same sheet as above, uploaded a second time with
+      // a cleaner name, so the revision does come off the filename here.
+      name: [{ value: 'PN-CGD-DR-A-A111', at: 1350, final: true }],
+      fields: {
+        'Type':           { value: 'Drawing',                          source: 'filename', at: 1000 },
+        'Discipline':     { value: 'Architectural',                    source: 'filename', at: 1250 },
+        'Revision':       { value: 'C01',                              source: 'filename', at: 1600 },
+        'Originator':     { value: 'CGD',                              source: 'ml',       at: 2000 },
+        'Description':    { value: 'First Floor Dimension Plan',       source: 'ml',       at: 2350 },
+        'Classification': { value: 'S4 - Suitable for Stage Approval', source: 'ml',       at: 2700 },
+      }
+    },
+    { // DR-A-1990.pdf — filename carries only type and discipline, so the
+      // container ID lands incomplete first and fills in once ML resolves the
+      // originator from the title block.
+      name: [
+        { value: 'PN-__-DR-A-1990',  at: 1400, final: false },
+        { value: 'PN-CGD-DR-A-1990', at: 3400, final: true  },
+      ],
+      fields: {
+        'Type':           { value: 'Drawing',                        source: 'filename', at: 1200 },
+        'Discipline':     { value: 'Architectural',                  source: 'filename', at: 1500 },
+        'Revision':       { value: 'P02',                            source: 'ml',       at: 2400 },
+        'Description':    { value: 'North and East Elevations',      source: 'ml',       at: 3100 },
+        'Originator':     { value: 'CGD',                            source: 'ml',       at: 3400 },
+        'Classification': { value: 'S2 - Suitable for Information',  source: 'ml',       at: 4200 },
+      }
+    },
+    { // A113_FIRST FLOOR…CEILING PLAN.pdf — sheet number and title are both in
+      // the filename; everything else comes from the title block.
+      name: [{ value: 'PN-CGD-DR-A-A113', at: 1550, final: true }],
+      fields: {
+        'Discipline':     { value: 'Architectural',                        source: 'filename', at: 1450 },
+        'Description':    { value: 'First Floor Reflected Ceiling Plan',   source: 'filename', at: 1700 },
+        'Type':           { value: 'Drawing',                              source: 'ml',       at: 2600 },
+        'Revision':       { value: 'P01',                                  source: 'ml',       at: 3300 },
+        'Originator':     { value: 'CGD',                                  source: 'ml',       at: 4100 },
+        'Classification': { value: 'S3 - Suitable for Review and Comment', source: 'ml',       at: 4800 },
+      }
+    },
+    { // A003_Life Safety Plans.pdf
+      name: [{ value: 'PN-CGD-DR-A-A003', at: 1750, final: true }],
+      fields: {
+        'Discipline':     { value: 'Architectural',                 source: 'filename', at: 1650 },
+        'Description':    { value: 'Life Safety Plans',             source: 'filename', at: 1950 },
+        'Type':           { value: 'Drawing',                       source: 'ml',       at: 3000 },
+        'Revision':       { value: 'C02',                           source: 'ml',       at: 3900 },
+        'Originator':     { value: 'CGD',                           source: 'ml',       at: 4700 },
+        'Classification': { value: 'A1 - Authorized and Accepted',  source: 'ml',       at: 5600 },
+      }
+    },
+    { // A111_FIRST FLOOR…ENSION PLAN.pdf
+      name: [{ value: 'PN-CGD-DR-A-A111', at: 1950, final: true }],
+      fields: {
+        'Discipline':     { value: 'Architectural',                   source: 'filename', at: 1850 },
+        'Description':    { value: 'First Floor Dimension Plan',      source: 'filename', at: 2200 },
+        'Type':           { value: 'Drawing',                         source: 'ml',       at: 3400 },
+        'Revision':       { value: 'P01',                             source: 'ml',       at: 4400 },
+        'Originator':     { value: 'CGD',                             source: 'ml',       at: 5300 },
+        'Classification': { value: 'S1 - Suitable for Coordination',  source: 'ml',       at: 6400 },
+      }
+    },
+  ];
+
+  const SOURCE_COPY = {
+    filename: 'This value was detected and extracted from the file name.',
+    ml:       'This value was detected and extracted from the file contents.',
+  };
+
   function startUpload() {
+    // a re-upload restarts the demo — drop any detection still in flight
+    (state.timers || []).forEach(clearTimeout);
+    state.timers = [];
+    state.manualCells = {};
+    state.resolved = {};
+    state.nameResolved = {};
+
     // swap panel from empty-state to the populated table
     document.getElementById('emptyMode').classList.add('hidden');
     const tableMode = document.getElementById('tableMode');
@@ -839,7 +1007,7 @@
       '<th><div class="th-inner">File <span class="th-menu">⋮</span></div></th>' +
       '<th><div class="th-inner">Name <span class="th-menu">⋮</span></div></th>';
     META_COLS.forEach(c => {
-      thead += `<th><div class="th-inner">${c}${COLS_WITH_MENU.has(c) ? ' <span class="th-menu">⋮</span>' : ''}</div></th>`;
+      thead += `<th class="th-meta"><div class="th-inner">${c}${COLS_WITH_MENU.has(c) ? ' <span class="th-menu">⋮</span>' : ''}</div></th>`;
     });
     thead += '</tr>';
 
@@ -848,9 +1016,9 @@
     state.selectedFiles.forEach((f, i) => {
       let cells = `
         <td class="col-check"><span class="checkbox" onclick="toggleRow(this)"></span></td>
-        <td><span class="req-processing"><span class="mini-spin"></span> Processing</span></td>
+        <td data-req="${i}"><span class="req-processing"><span class="mini-spin"></span> Processing</span></td>
         <td><span class="file-cell"><a class="file-link" href="#" onclick="return false">${f.name}</a></span></td>
-        <td><span class="name-placeholder">—-—-—-—</span></td>`;
+        <td data-name="${i}"><span class="name-placeholder">—-—-—-—</span></td>`;
       META_COLS.forEach(field => {
         cells += `<td><div class="mcell" data-row="${i}" data-field="${field}" tabindex="0"><span class="mini-spin"></span></div></td>`;
       });
@@ -861,11 +1029,37 @@
 
     // wire loading-cell interactions
     tableMode.querySelectorAll('.mcell').forEach(cell => {
-      cell.addEventListener('mouseenter', () => { if (!cell.classList.contains('manual')) showCellTooltip(cell); });
+      cell.addEventListener('mouseenter', () => {
+        if (!cell.classList.contains('manual') && !cell.classList.contains('detected')) showCellTooltip(cell);
+      });
       cell.addEventListener('mouseleave', hideCellTooltip);
-      cell.addEventListener('click', () => editCell(cell));
-      cell.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); editCell(cell); } });
+      // the sparkle is an info affordance, not an edit target — let it be
+      cell.addEventListener('click', (e) => { if (!e.target.closest('.detect-badge')) editCell(cell); });
+      cell.addEventListener('keydown', (e) => {
+        if (e.target.closest('.detect-badge')) return;
+        // keystrokes inside the editor are the editor's business: without this
+        // the cell swallows the space bar and Enter re-opens an empty editor
+        if (e.target.tagName === 'INPUT') return;
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); editCell(cell); }
+      });
     });
+
+    // sparkles are injected as detection lands, so delegate their hover/focus
+    tableMode.addEventListener('mouseover', (e) => {
+      const badge = e.target.closest('.detect-badge');
+      if (badge) showDetectTooltip(badge);
+    });
+    tableMode.addEventListener('mouseout', (e) => {
+      if (e.target.closest('.detect-badge')) hideDetectTooltip();
+    });
+    tableMode.addEventListener('focusin', (e) => {
+      const badge = e.target.closest('.detect-badge');
+      if (badge) showDetectTooltip(badge);
+    });
+    tableMode.addEventListener('focusout', (e) => {
+      if (e.target.closest('.detect-badge')) hideDetectTooltip();
+    });
+    tableMode.addEventListener('scroll', () => { hideCellTooltip(); hideDetectTooltip(); });
 
     // footer count reflects uploaded rows
     const footerCount = document.querySelector('#screen-uploads .panel-footer em');
@@ -873,7 +1067,83 @@
 
     // show the Uploads toast
     showUploadsToast();
+
+    // kick off the auto-detection pass
+    scheduleDetection();
   }
+
+  // ─────────── Auto-detection ───────────
+  // Each field resolves on its own timer, so rows fill in unevenly: some cells
+  // land while their neighbours are still spinning, and a row only offers
+  // Submit once every field and its container ID have resolved.
+  function scheduleDetection() {
+    state.selectedFiles.forEach((f, i) => {
+      const plan = DETECTION[f.srcIndex];
+      if (!plan) return;
+      plan.name.forEach(step => {
+        state.timers.push(setTimeout(() => applyName(i, step.value, step.final), step.at));
+      });
+      Object.keys(plan.fields).forEach(field => {
+        const d = plan.fields[field];
+        state.timers.push(setTimeout(() => applyDetection(i, field, d.value, d.source), d.at));
+      });
+    });
+  }
+
+  function badgeHtml(source) {
+    return `<button class="detect-badge" type="button" data-source="${source}" tabindex="0"` +
+           ` aria-label="Detected — ${SOURCE_COPY[source]}">${sparkle(15)}</button>`;
+  }
+
+  function applyDetection(row, field, value, source) {
+    const cell = document.querySelector(`#tableMode .mcell[data-row="${row}"][data-field="${field}"]`);
+    if (!cell) return;
+    // a value the user already took over is never overwritten by detection
+    if (state.manualCells[row + '|' + field]) return;
+    cell.classList.add('detected', 'filled');
+    cell.innerHTML = `<span class="mval">${value}</span>` + badgeHtml(source);
+    state.resolved[row + '|' + field] = true;
+    checkRowDone(row);
+  }
+
+  function applyName(row, value, final) {
+    const td = document.querySelector(`#tableMode td[data-name="${row}"]`);
+    if (!td) return;
+    td.innerHTML = `<span class="name-value">${value}</span>`;
+    if (final) { state.nameResolved[row] = true; checkRowDone(row); }
+  }
+
+  // Row is submittable once the container ID and every metadata field have
+  // settled — whether detected or filled in by hand.
+  function checkRowDone(row) {
+    if (!state.nameResolved[row]) return;
+    const allIn = META_COLS.every(f => state.resolved[row + '|' + f]);
+    if (!allIn) return;
+    const td = document.querySelector(`#tableMode td[data-req="${row}"]`);
+    if (!td || td.dataset.done === '1') return;
+    td.dataset.done = '1';
+    td.innerHTML = `<button class="req-submit" type="button">${CHECK_ICON} Submit</button>`;
+  }
+
+  // ── provenance tooltip on the sparkle ──
+  const detectTooltip = document.getElementById('detectTooltip');
+  document.getElementById('detectTooltipSpark').innerHTML = sparkle(16);
+
+  function showDetectTooltip(badge) {
+    hideCellTooltip();
+    document.getElementById('detectTooltipText').textContent = SOURCE_COPY[badge.dataset.source] || '';
+    detectTooltip.classList.add('show');
+    const b = badge.getBoundingClientRect();
+    const tw = detectTooltip.offsetWidth, th = detectTooltip.offsetHeight;
+    const anchor = b.left + b.width / 2;
+    let left = anchor - tw / 2;
+    left = Math.max(8, Math.min(left, window.innerWidth - tw - 8));
+    detectTooltip.style.left = left + 'px';
+    detectTooltip.style.top = (b.top - th - 12) + 'px';
+    // tail tracks the sparkle even when the card is clamped to the viewport
+    document.getElementById('detectTooltipTail').style.left = (anchor - left - 6) + 'px';
+  }
+  function hideDetectTooltip() { detectTooltip.classList.remove('show'); }
 
   // ── loading-cell tooltip ──
   const cellTooltip = document.getElementById('cellTooltip');
@@ -886,19 +1156,53 @@
   }
   function hideCellTooltip() { cellTooltip.classList.remove('show'); }
 
-  // ── click to edit → stops auto-detection for that cell ──
+  // ── click to edit ──
+  // On a still-loading cell this stops auto-detection for that cell. On an
+  // already-detected cell it seeds the input with the detected value; the
+  // sparkle only goes away if the user actually changes it (user_corrected).
   function editCell(cell) {
     hideCellTooltip();
-    if (cell.classList.contains('manual')) { const inp = cell.querySelector('input'); if (inp) inp.focus(); return; }
+    hideDetectTooltip();
+    if (cell.classList.contains('editing')) { const inp = cell.querySelector('input'); if (inp) inp.focus(); return; }
+
     const row = cell.dataset.row, field = cell.dataset.field;
-    state.manualCells[row + '|' + field] = true; // detection stopped for this cell (user_corrected)
+    const wasDetected = cell.classList.contains('detected');
+    const valueEl = wasDetected ? cell.querySelector('.mval') : null;
+    const badgeEl = wasDetected ? cell.querySelector('.detect-badge') : null;
+    const prevValue = valueEl ? valueEl.textContent : '';
+    const prevSource = badgeEl ? badgeEl.dataset.source : '';
+
+    if (!wasDetected) state.manualCells[row + '|' + field] = true; // detection stopped for this cell
+    cell.classList.remove('detected');
     cell.classList.add('manual', 'editing');
     cell.innerHTML = '<input type="text" aria-label="' + field + '">';
+
     const input = cell.querySelector('input');
+    input.value = prevValue;
     input.focus();
+    input.select();
+
     input.addEventListener('blur', () => {
       cell.classList.remove('editing');
-      if (input.value.trim()) cell.classList.add('filled'); else cell.classList.remove('filled');
+      const val = input.value.trim();
+
+      if (wasDetected && prevSource && val === prevValue) {
+        // untouched — put the detected state back, sparkle and all
+        cell.classList.remove('manual');
+        cell.classList.add('detected', 'filled');
+        cell.innerHTML = `<span class="mval">${prevValue}</span>` + badgeHtml(prevSource);
+        return;
+      }
+
+      state.manualCells[row + '|' + field] = true;
+      state.resolved[row + '|' + field] = true;
+      cell.classList.toggle('filled', !!val);
+      cell.textContent = '';
+      const span = document.createElement('span');
+      span.className = 'mval';
+      span.textContent = val; // user input — never through innerHTML
+      cell.appendChild(span);
+      checkRowDone(row);
     });
     input.addEventListener('keydown', (e) => { if (e.key === 'Enter') input.blur(); });
   }

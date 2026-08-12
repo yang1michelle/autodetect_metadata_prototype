@@ -21,5 +21,18 @@ then visit http://localhost:8000
    Classification) show per-cell loading spinners while detection runs. Hovering
    a cell explains what's happening; clicking one takes over manually and stops
    auto-detection for that cell.
-5. The **Uploads toast** (bottom right) tracks upload progress and can be
+5. **Detection lands progressively.** Each field resolves on its own timer, so
+   rows fill in unevenly — cells settle while their neighbours are still
+   spinning. A detected value drops its input chrome and gains an orange
+   sparkle. The **Name** column resolves to an ISO 19650 information container
+   ID; where the filename is missing a segment, the ID appears incomplete
+   (`PN-__-DR-A-1990`) until the ML pass fills the gap.
+6. **Hover a sparkle** to see where the value came from — "extracted from the
+   file name" for values parsed out of the container ID, "extracted from the
+   file contents" for values read from the drawing's title block.
+7. Once every field and the container ID have resolved, **Required Action**
+   flips from *Processing* to a **Submit** button.
+8. Editing a detected value removes its sparkle (the value is now
+   user-corrected); leaving it untouched restores it.
+9. The **Uploads toast** (bottom right) tracks upload progress and can be
    collapsed or dismissed.
