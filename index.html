@@ -535,8 +535,21 @@
   .toast-row .tmeta { flex: 1; min-width: 0; }
   .toast-row .tname { font-weight: 600; color: var(--gray-15); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .toast-row .tsub { font-size: 12px; color: var(--gray-50); display: flex; align-items: center; gap: 10px; margin-top: 6px; }
-  .toast-row .tbar { flex: 1; height: 4px; background: var(--gray-90); border-radius: 2px; overflow: hidden; max-width: 130px; }
-  .toast-row .tbar-fill { display: block; height: 100%; width: 0; background: var(--blue-40); transition: width .5s ease; }
+  .toast-row .tbar { flex: 1; height: 6px; background: var(--gray-90); border-radius: 3px; overflow: hidden; max-width: 130px; }
+  .toast-row .tbar-fill {
+    display: block; height: 100%; width: 0; background-color: var(--blue-40); border-radius: 3px;
+    transition: width .8s cubic-bezier(.25,.8,.35,1);
+  }
+  /* barber-pole stripes travel while the transfer is in flight, then the bar
+     goes solid once the file has finished uploading */
+  .toast-row .tbar-fill.uploading {
+    background-image: linear-gradient(115deg,
+      rgba(255,255,255,.45) 25%, transparent 25%, transparent 50%,
+      rgba(255,255,255,.45) 50%, rgba(255,255,255,.45) 75%, transparent 75%);
+    background-size: 11px 11px;
+    animation: barber .6s linear infinite;
+  }
+  @keyframes barber { from { background-position: 0 0; } to { background-position: 11px 0; } }
 </style>
 </head>
 <body>
@@ -900,6 +913,8 @@
   // hover tooltip the sparkle shows:
   //   'filename' → the value was parsed out of the information container ID
   //   'ml'       → the value was read out of the drawing's title block
+  // Description is always ML: a title is never taken off the filename, even
+  // when the filename happens to contain one.
   // Metadata follows ISO 19650: container IDs are
   // [Project]-[Originator]-[Type]-[Discipline]-[Number], revisions use the
   // P__ (preliminary) / C__ (contractual) sequence, and Classification carries
@@ -946,12 +961,12 @@
         'Classification': { value: 'S2 - Suitable for Information',  source: 'ml',       at: 4200 },
       }
     },
-    { // A113_FIRST FLOOR…CEILING PLAN.pdf — sheet number and title are both in
-      // the filename; everything else comes from the title block.
+    { // A113_FIRST FLOOR…CEILING PLAN.pdf — only the sheet number is parseable
+      // from the filename; everything else comes from the title block.
       name: [{ value: 'PN-CGD-DR-A-A113', at: 1550, final: true }],
       fields: {
         'Discipline':     { value: 'Architectural',                        source: 'filename', at: 1450 },
-        'Description':    { value: 'First Floor Reflected Ceiling Plan',   source: 'filename', at: 1700 },
+        'Description':    { value: 'First Floor Reflected Ceiling Plan',   source: 'ml',       at: 1700 },
         'Type':           { value: 'Drawing',                              source: 'ml',       at: 2600 },
         'Revision':       { value: 'P01',                                  source: 'ml',       at: 3300 },
         'Originator':     { value: 'CGD',                                  source: 'ml',       at: 4100 },
@@ -962,7 +977,7 @@
       name: [{ value: 'PN-CGD-DR-A-A003', at: 1750, final: true }],
       fields: {
         'Discipline':     { value: 'Architectural',                 source: 'filename', at: 1650 },
-        'Description':    { value: 'Life Safety Plans',             source: 'filename', at: 1950 },
+        'Description':    { value: 'Life Safety Plans',             source: 'ml',       at: 1950 },
         'Type':           { value: 'Drawing',                       source: 'ml',       at: 3000 },
         'Revision':       { value: 'C02',                           source: 'ml',       at: 3900 },
         'Originator':     { value: 'CGD',                           source: 'ml',       at: 4700 },
@@ -973,7 +988,7 @@
       name: [{ value: 'PN-CGD-DR-A-A111', at: 1950, final: true }],
       fields: {
         'Discipline':     { value: 'Architectural',                   source: 'filename', at: 1850 },
-        'Description':    { value: 'First Floor Dimension Plan',      source: 'filename', at: 2200 },
+        'Description':    { value: 'First Floor Dimension Plan',      source: 'ml',       at: 2200 },
         'Type':           { value: 'Drawing',                         source: 'ml',       at: 3400 },
         'Revision':       { value: 'P01',                             source: 'ml',       at: 4400 },
         'Originator':     { value: 'CGD',                             source: 'ml',       at: 5300 },
@@ -1234,8 +1249,17 @@
     const toast = document.getElementById('uploadsToast');
     toast.classList.remove('collapsed');
     toast.classList.add('open');
-    // animate upload progress bars to complete (upload finishes; detection keeps running)
-    fills.forEach((fill, idx) => setTimeout(() => { fill.style.width = '100%'; }, 200 + idx * 160));
+
+    // Run each file's bar up in three uneven stages so the transfers read like
+    // real ones rather than a single sweep, staggered so they don't march in
+    // lockstep. Uploads finish while detection is still running.
+    fills.forEach((fill, idx) => {
+      fill.classList.add('uploading');
+      state.timers.push(setTimeout(() => { fill.style.width = '58%';  }, 250  + idx * 220));
+      state.timers.push(setTimeout(() => { fill.style.width = '86%';  }, 1500 + idx * 260));
+      state.timers.push(setTimeout(() => { fill.style.width = '100%'; }, 2600 + idx * 320));
+      state.timers.push(setTimeout(() => { fill.classList.remove('uploading'); }, 3400 + idx * 320));
+    });
   }
   function toggleToastCollapse() { document.getElementById('uploadsToast').classList.toggle('collapsed'); }
   function closeToast() { document.getElementById('uploadsToast').classList.remove('open'); }
