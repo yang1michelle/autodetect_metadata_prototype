@@ -416,6 +416,21 @@
   table.uploads thead th .th-menu { margin-left: 4px; color: var(--gray-50); cursor: pointer; }
   table.uploads .col-check { width: 44px; text-align: center; }
   table.uploads tbody tr:hover { background: var(--gray-98); }
+
+  /* ── Pinned left columns ──
+     The row identity columns (checkbox, Required Action, File, Name) stay put
+     while the metadata columns scroll underneath. Left offsets are measured and
+     assigned in JS, since the columns size to their content. */
+  table.uploads th.sticky-col, table.uploads td.sticky-col {
+    position: sticky; z-index: 1; background: var(--white);
+  }
+  table.uploads thead th.sticky-col { z-index: 3; background: var(--gray-98); }
+  /* the sticky cells opt out of the row background, so restore hover by hand */
+  table.uploads tbody tr:hover td.sticky-col { background: var(--gray-98); }
+  /* trailing edge of the pinned block casts over the scrolling columns */
+  table.uploads th.sticky-edge, table.uploads td.sticky-edge {
+    box-shadow: 6px 0 8px -5px rgba(0, 0, 0, .18);
+  }
   .req-processing { display: inline-flex; align-items: center; gap: 8px; color: var(--gray-40); font-style: italic; }
   .mini-spin {
     width: 15px; height: 15px; border: 2px solid var(--gray-85); border-top-color: var(--gray-40);
@@ -1093,8 +1108,49 @@
     // show the Uploads toast
     showUploadsToast();
 
+    // pin the identity columns, and re-measure when the viewport changes
+    applyStickyColumns();
+    window.addEventListener('resize', scheduleStickyUpdate);
+
     // kick off the auto-detection pass
     scheduleDetection();
+  }
+
+  // ─────────── Pinned left columns ───────────
+  // Checkbox, Required Action, File and Name stay pinned while the metadata
+  // columns scroll under them. Offsets are measured rather than hard-coded
+  // because the columns size to their content — and that content changes as
+  // detection lands (a Name placeholder becoming a container ID, Processing
+  // becoming Submit), so this re-runs on every update.
+  const STICKY_COLS = 4;
+  let stickyFrame = null;
+
+  function applyStickyColumns() {
+    const table = document.querySelector('#tableMode table.uploads');
+    if (!table) return;
+    const headCells = table.querySelectorAll('thead th');
+    if (headCells.length < STICKY_COLS) return;
+
+    const offsets = [];
+    let left = 0;
+    for (let i = 0; i < STICKY_COLS; i++) {
+      offsets.push(left);
+      left += headCells[i].getBoundingClientRect().width;
+    }
+
+    table.querySelectorAll('tr').forEach(tr => {
+      for (let i = 0; i < STICKY_COLS && i < tr.children.length; i++) {
+        const cell = tr.children[i];
+        cell.classList.add('sticky-col');
+        cell.classList.toggle('sticky-edge', i === STICKY_COLS - 1);
+        cell.style.left = offsets[i] + 'px';
+      }
+    });
+  }
+
+  function scheduleStickyUpdate() {
+    if (stickyFrame) return;
+    stickyFrame = requestAnimationFrame(() => { stickyFrame = null; applyStickyColumns(); });
   }
 
   // ─────────── Auto-detection ───────────
@@ -1135,6 +1191,7 @@
     const td = document.querySelector(`#tableMode td[data-name="${row}"]`);
     if (!td) return;
     td.innerHTML = `<span class="name-value">${value}</span>`;
+    scheduleStickyUpdate(); // the Name column just changed width
     if (final) { state.nameResolved[row] = true; checkRowDone(row); }
   }
 
@@ -1148,6 +1205,7 @@
     if (!td || td.dataset.done === '1') return;
     td.dataset.done = '1';
     td.innerHTML = `<button class="req-submit" type="button">${CHECK_ICON} Submit</button>`;
+    scheduleStickyUpdate(); // Processing -> Submit changes the column width
   }
 
   // ── provenance tooltip on the sparkle ──
