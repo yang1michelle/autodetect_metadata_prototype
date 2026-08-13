@@ -512,9 +512,12 @@
   .mcell.optional-missing,
   .mcell.empty-detected { border-color: transparent; background: transparent; }
   .mcell.empty-detected { cursor: pointer; }
-  .mcell.optional-missing .opt-field { opacity: 0; transition: opacity .12s ease; }
+  .mcell.optional-missing .opt-field,
+  .mcell.empty-detected .opt-field { opacity: 0; transition: opacity .12s ease; }
   .mcell.optional-missing:hover .opt-field,
-  .mcell.optional-missing:focus-within .opt-field { opacity: 1; }
+  .mcell.optional-missing:focus-within .opt-field,
+  .mcell.empty-detected:hover .opt-field,
+  .mcell.empty-detected:focus-within .opt-field { opacity: 1; }
   .opt-field {
     display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; height: 34px;
     border: 1px solid var(--gray-85); border-radius: var(--radius-md); padding: 0 10px;
@@ -1445,7 +1448,7 @@
     } else {
       // optional — no error treatment, and the control only shows on hover
       cell.classList.add('optional-missing');
-      cell.innerHTML = `<span class="opt-field"><span class="err-ph">${cfg.placeholder}</span>${warn}${chev}</span>`;
+      cell.innerHTML = optionalControl(cfg, warn);
     }
 
     state.resolved[row + '|' + field] = true;
@@ -1453,16 +1456,23 @@
   }
 
   // Detection ran and correctly found nothing to record for an optional field.
-  // That is a success, not a failure, so the cell is plainly empty — no
-  // warning, nothing to reveal on hover.
+  // That is a success, not a failure, so hovering offers the control to fill it
+  // by hand with no warning attached — the only difference from a failure.
   function applyEmpty(row, field) {
     const cell = document.querySelector(`#tableMode .mcell[data-row="${row}"][data-field="${field}"]`);
     if (!cell) return;
     if (state.manualCells[row + '|' + field]) return;
+    const cfg = FIELD_CONFIG[field] || { control: 'text', placeholder: 'Enter text' };
     cell.classList.add('empty-detected');
-    cell.innerHTML = '';
+    cell.innerHTML = optionalControl(cfg, '');
     state.resolved[row + '|' + field] = true;
     checkRowDone(row);
+  }
+
+  // Hidden until the cell is hovered, for both optional empty states.
+  function optionalControl(cfg, warn) {
+    return `<span class="opt-field"><span class="err-ph">${cfg.placeholder}</span>${warn}` +
+      (cfg.control === 'dropdown' ? '<span class="err-chev">▾</span>' : '') + '</span>';
   }
 
   function applyName(row, value, final) {
