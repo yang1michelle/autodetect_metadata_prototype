@@ -426,7 +426,13 @@
   table.uploads thead th .th-inner { display: flex; align-items: center; gap: 6px; }
   table.uploads thead th .th-menu { margin-left: 4px; color: var(--gray-50); cursor: pointer; }
   table.uploads .col-check { width: 44px; text-align: center; }
-  table.uploads tbody tr:hover { background: var(--gray-98); }
+
+  /* Row hover: the whole row tints, except the cell actually under the pointer,
+     which keeps its own hover treatment. Painted per-cell rather than on the
+     row, because the pinned columns carry opaque backgrounds of their own and
+     would otherwise sit on top of the row tint. */
+  table.uploads tbody tr:hover td { background: #F4F5F6; }
+  table.uploads tbody tr:hover td:hover { background: var(--white); }
 
   /* ── Pinned left columns ──
      The row identity columns (checkbox, Required Action, File, Name) stay put
@@ -436,8 +442,6 @@
     position: sticky; z-index: 1; background: var(--white);
   }
   table.uploads thead th.sticky-col { z-index: 3; background: var(--gray-98); }
-  /* the sticky cells opt out of the row background, so restore hover by hand */
-  table.uploads tbody tr:hover td.sticky-col { background: var(--gray-98); }
   /* trailing edge of the pinned block casts over the scrolling columns */
   table.uploads th.sticky-edge, table.uploads td.sticky-edge {
     box-shadow: 6px 0 8px -5px rgba(0, 0, 0, .18);
