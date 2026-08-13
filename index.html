@@ -213,9 +213,10 @@
     display: flex; align-items: center; justify-content: center;
   }
   .rail-toggle:hover { filter: brightness(1.08); }
-  /* collapsed, the glyph sits bare on the panel, so brightness has nothing to
-     act on — give it a background to hover against instead */
-  .rail-toggle.collapsed:hover { filter: none; background: var(--gray-96); }
+  /* Collapsed, the glyph sits bare on the panel and hover brings in a plate
+     behind it. Painting the plate in CSS renders the same as the hover asset,
+     which is that glyph over a 36x36 rx=4 #E3E6E8 rect. */
+  .rail-toggle.collapsed:hover { filter: none; background: #E3E6E8; }
   .rail-toggle:focus-visible { outline: 2px solid var(--blue-40); outline-offset: 2px; }
   .rail-toggle svg { display: block; }
   .panel-header h2 { font-size: 17px; font-weight: 600; color: var(--gray-15); }
