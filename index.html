@@ -486,8 +486,7 @@
 
   .detect-badge {
     display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
-    margin-left: 8px; padding: 2px; border: none; background: none;
-    color: var(--orange-50); cursor: pointer;
+    margin-left: 8px; padding: 2px; border: none; background: none; cursor: pointer;
   }
   .detect-badge:focus-visible { outline: 2px solid var(--blue-40); outline-offset: 1px; border-radius: var(--radius-sm); }
 
@@ -566,7 +565,7 @@
     display: flex; align-items: flex-start; gap: 10px;
     font-size: 13px; line-height: 1.5; color: var(--gray-20);
   }
-  .detect-tooltip .reason .spark { color: var(--orange-50); flex-shrink: 0; margin-top: 1px; }
+  .detect-tooltip .reason .spark { flex-shrink: 0; margin-top: 1px; line-height: 0; }
   .detect-tooltip .tail {
     position: absolute; bottom: -7px; width: 12px; height: 12px; background: var(--white);
     border-right: 1px solid var(--gray-90); border-bottom: 1px solid var(--gray-90);
@@ -1039,9 +1038,15 @@
 
   const FILE_DETAIL_ICON = fileDetailIcon(18);
 
-  // Four-point auto-detect sparkle. Sized by the `s` argument so the same mark
-  // works in a table cell and inside the tooltip body.
-  const sparkle = (s) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 1.6c.5 5.2 2.6 8.3 10.4 10.4-7.8 2.1-9.9 5.2-10.4 10.4-.5-5.2-2.6-8.3-10.4-10.4C9.4 9.9 11.5 6.8 12 1.6z"/></svg>`;
+  // Auto-detect sparkle from the design system. Two-tone, so it carries its own
+  // fills rather than inheriting currentColor. Sized by `s` for the table cell
+  // and the tooltip body alike.
+  const sparkle = (s) => `<svg width="${s}" height="${s}" viewBox="0 0 16 16" fill="none" aria-hidden="true">` +
+    '<path d="M7.11321 7.11321C6.77777 7.44866 6.41038 7.74422 6.01441 8.00016C4.72019 7.16359 3.12068 6.75017 1.3335 6.75017C3.16619 6.75017 4.48563 6.20527 5.34545 5.34545C6.20527 4.48563 6.75016 3.16619 6.75016 1.3335H9.25016C9.25016 3.66746 8.54506 5.68137 7.11321 7.11321Z" fill="#FF7433"/>' +
+    '<path d="M8.88711 8.88712C9.22256 8.55167 9.58995 8.25612 9.98591 8.00017C11.2801 8.83674 12.8796 9.25017 14.6668 9.25017C12.8341 9.25017 11.5147 9.79506 10.6549 10.6549C9.79506 11.5147 9.25016 12.8341 9.25016 14.6668H6.75016C6.75016 12.3329 7.45527 10.319 8.88711 8.88712Z" fill="#FF7433"/>' +
+    '<path d="M8.88711 7.11321C8.55167 6.77777 8.25611 6.41038 8.00016 6.01441C8.83673 4.72019 9.25016 3.12068 9.25016 1.3335C9.25016 3.16619 9.79506 4.48563 10.6549 5.34545C11.5147 6.20527 12.8341 6.75016 14.6668 6.75016V9.25017C12.3329 9.25017 10.319 8.54506 8.88711 7.11321Z" fill="#FF5100"/>' +
+    '<path d="M7.11321 8.88713C5.68137 7.45528 3.66746 6.75017 1.3335 6.75017V9.25018C3.16619 9.25018 4.48563 9.79507 5.34545 10.6549C6.20527 11.5147 6.75016 12.8341 6.75016 14.6668C6.75016 12.8797 7.16359 11.2801 8.00016 9.98592C7.74421 9.58996 7.44866 9.22257 7.11321 8.88713Z" fill="#FF5100"/>' +
+    '</svg>';
 
   const CHECK_ICON = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
@@ -1374,7 +1379,7 @@
 
   function badgeHtml(source) {
     return `<button class="detect-badge" type="button" data-source="${source}" tabindex="0"` +
-           ` aria-label="Detected — ${SOURCE_COPY[source]}">${sparkle(15)}</button>`;
+           ` aria-label="Detected — ${SOURCE_COPY[source]}">${sparkle(16)}</button>`;
   }
 
   function applyDetection(row, field, value, source) {
