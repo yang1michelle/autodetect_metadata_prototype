@@ -432,7 +432,9 @@
      row, because the pinned columns carry opaque backgrounds of their own and
      would otherwise sit on top of the row tint. */
   table.uploads tbody tr:hover td { background: #F4F5F6; }
-  table.uploads tbody tr:hover td:hover { background: var(--white); }
+  /* TODO: awaiting the hex — the directly-hovered cell sits a step darker than
+     the row tint, with the white edit box on top of it. */
+  table.uploads tbody tr:hover td:hover { background: #EBEDEF; }
 
   /* ── Pinned left columns ──
      The row identity columns (checkbox, Required Action, File, Name) stay put
@@ -476,7 +478,14 @@
     border: none; outline: none; flex: 1; font-size: 14px; font-family: var(--font);
     background: transparent; color: var(--gray-15); width: 100%;
   }
-  .mcell .mval { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* The value carries its own box so the edit affordance can appear on hover
+     without the sparkle moving inside it. Border and background are transparent
+     at rest, so nothing shifts when they come in. */
+  .mcell .mval {
+    flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    display: block; height: 34px; line-height: 32px; padding: 0 10px;
+    border: 1px solid transparent; border-radius: var(--radius-md); background: transparent;
+  }
 
   /* Detected (success) state — the input chrome drops away and the value reads
      as plain text with the auto-detect sparkle pinned to the right of the cell.
@@ -484,9 +493,15 @@
   .mcell.detected,
   .mcell.manual.filled:not(.editing) {
     border-color: transparent; background: transparent; color: var(--gray-15);
+    padding: 0; /* the box moved onto .mval, so the cell itself adds no inset */
   }
   .mcell.detected:hover,
   .mcell.manual.filled:not(.editing):hover { border-color: transparent; background: transparent; }
+  /* hovering the cell brings up the edit box around the value */
+  .mcell.detected:hover .mval,
+  .mcell.manual.filled:not(.editing):hover .mval {
+    border-color: var(--gray-85); background: var(--white);
+  }
 
   .detect-badge {
     display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
@@ -504,7 +519,9 @@
   table.uploads tbody tr:hover td.cell-error { background: #FDF7F7; }
   table.uploads tbody tr:hover td.cell-error:hover { background: #FAE5E5; }
 
-  .mcell.not-detected { border-color: transparent; background: transparent; cursor: pointer; }
+  /* padding 0 so the inner box lines up with the one a detected cell shows on
+     hover — boxes must not stagger down a column */
+  .mcell.not-detected { border-color: transparent; background: transparent; cursor: pointer; padding: 0; }
   .mcell.not-detected:hover { border-color: transparent; background: transparent; }
 
   /* ── Optional field states ──
@@ -514,7 +531,7 @@
      once the user hovers it. Where detection correctly found nothing to record,
      the cell is simply empty with nothing to reveal. */
   .mcell.optional-missing,
-  .mcell.empty-detected { border-color: transparent; background: transparent; }
+  .mcell.empty-detected { border-color: transparent; background: transparent; padding: 0; }
   .mcell.empty-detected { cursor: pointer; }
   .mcell.optional-missing .opt-field,
   .mcell.empty-detected .opt-field { opacity: 0; transition: opacity .12s ease; }
