@@ -472,12 +472,25 @@
     background: var(--white); cursor: pointer; color: var(--gray-30);
   }
   .mcell:hover { border-color: var(--gray-50); background: var(--gray-98); }
-  .mcell.editing { border-color: var(--blue-40); box-shadow: 0 0 0 2px var(--blue-96); cursor: text; background: var(--white); }
+  /* padding stays on .mval for every state that uses it, otherwise the box
+     jumps 10px the moment editing starts and the cell drops .detected */
+  .mcell.editing, .mcell.manual { padding: 0; }
+  .mcell.editing { cursor: text; }
   .mcell.filled { color: var(--gray-15); }
-  .mcell input, .mcell select {
-    border: none; outline: none; flex: 1; font-size: 14px; font-family: var(--font);
-    background: transparent; color: var(--gray-15); width: 100%;
+  /* the edit box is the value's box, so the sparkle and the required mark stay
+     outside it rather than being swallowed when editing starts */
+  .mcell.editing .mval {
+    border-color: var(--blue-40); background: var(--white); box-shadow: 0 0 0 2px var(--blue-96);
   }
+  .mcell .mval input, .mcell .mval select {
+    display: block; width: 100%; height: 32px; border: none; outline: none;
+    background: transparent; color: var(--gray-15); font-size: 14px; font-family: var(--font);
+  }
+
+  /* Required-field mark. Always in the DOM so nothing shifts when it appears,
+     and revealed with the edit affordance it belongs to. */
+  .req-mark { flex-shrink: 0; margin-left: 6px; color: var(--red-50); font-size: 14px; line-height: 1; opacity: 0; }
+  .mcell:hover .req-mark, .mcell.editing .req-mark { opacity: 1; }
   /* The value carries its own box so the edit affordance can appear on hover
      without the sparkle moving inside it. Border and background are transparent
      at rest, so nothing shifts when they come in. */
@@ -1420,6 +1433,13 @@
     scheduleStickyUpdate(); // the Required Action column just got wider
   }
 
+  // Marks a required field, alongside the value rather than in the header, so
+  // the user sees it at the point of editing.
+  function requiredMark(field) {
+    const cfg = FIELD_CONFIG[field];
+    return cfg && cfg.required ? '<span class="req-mark" aria-hidden="true">*</span>' : '';
+  }
+
   function badgeHtml(source) {
     return `<button class="detect-badge" type="button" data-source="${source}" tabindex="0"` +
            ` aria-label="Detected — ${SOURCE_COPY[source]}">${sparkle(16)}</button>`;
@@ -1431,7 +1451,7 @@
     // a value the user already took over is never overwritten by detection
     if (state.manualCells[row + '|' + field]) return;
     cell.classList.add('detected', 'filled');
-    cell.innerHTML = `<span class="mval">${value}</span>` + badgeHtml(source);
+    cell.innerHTML = `<span class="mval">${value}</span>` + badgeHtml(source) + requiredMark(field);
     state.resolved[row + '|' + field] = true;
     checkRowDone(row);
   }
@@ -1638,10 +1658,14 @@
     const options = useSelect && prevValue && !cfg.options.includes(prevValue)
       ? [prevValue].concat(cfg.options)
       : (cfg.options || []);
-    cell.innerHTML = useSelect
-      ? `<select aria-label="${field}"><option value=""></option>` +
+    const cfgRequired = cfg.required ? ' aria-required="true"' : '';
+    const control = useSelect
+      ? `<select aria-label="${field}"${cfgRequired}><option value=""></option>` +
         options.map(o => `<option>${o}</option>`).join('') + '</select>'
-      : `<input type="text" aria-label="${field}">`;
+      : `<input type="text" aria-label="${field}"${cfgRequired}>`;
+    // the sparkle and required mark stay put while editing — only the box changes
+    cell.innerHTML = `<span class="mval">${control}</span>` +
+      (prevSource ? badgeHtml(prevSource) : '') + requiredMark(field);
 
     const input = cell.querySelector('input, select');
     input.value = prevValue;
@@ -1656,7 +1680,7 @@
         // untouched — put the detected state back, sparkle and all
         cell.classList.remove('manual');
         cell.classList.add('detected', 'filled');
-        cell.innerHTML = `<span class="mval">${prevValue}</span>` + badgeHtml(prevSource);
+        cell.innerHTML = `<span class="mval">${prevValue}</span>` + badgeHtml(prevSource) + requiredMark(field);
         return;
       }
 
@@ -1682,6 +1706,7 @@
       span.className = 'mval';
       span.textContent = val; // user input — never through innerHTML
       cell.appendChild(span);
+      cell.insertAdjacentHTML('beforeend', requiredMark(field));
       checkRowDone(row);
     };
 
