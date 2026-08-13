@@ -213,6 +213,9 @@
     display: flex; align-items: center; justify-content: center;
   }
   .rail-toggle:hover { filter: brightness(1.08); }
+  /* collapsed, the glyph sits bare on the panel, so brightness has nothing to
+     act on — give it a background to hover against instead */
+  .rail-toggle.collapsed:hover { filter: none; background: var(--gray-96); }
   .rail-toggle:focus-visible { outline: 2px solid var(--blue-40); outline-offset: 2px; }
   .rail-toggle svg { display: block; }
   .panel-header h2 { font-size: 17px; font-weight: 600; color: var(--gray-15); }
@@ -919,24 +922,32 @@
   // ─────────── Saved Views rail ───────────
   // Collapsing the rail hands its width to the register, which is the whole
   // point of the control — so the pinned columns are re-measured afterwards.
-  const RAIL_TOGGLE_ICON = '<svg width="36" height="36" viewBox="0 0 36 36" fill="none" aria-hidden="true">' +
-    '<rect width="36" height="36" rx="4" fill="#2066DF"/>' +
-    '<path d="M27.0181 12.5H19.0181V15H27.0181V12.5Z" fill="white"/>' +
-    '<path d="M27.0181 21H19.0181V23.5H27.0181V21Z" fill="white"/>' +
-    '<path d="M13.7862 19.25H27.0181V16.75H13.7845L17.7516 12.7823L15.9837 11.0146L9.00018 17.9993L15.9841 24.9839L17.752 23.2162L13.7862 19.25Z" fill="white"/>' +
-    '</svg>';
+  // Two assets rather than one mirrored: the expanded state is a filled blue
+  // plate, the collapsed state a bare dark glyph on the panel background.
+  const RAIL_TOGGLE_ICONS = {
+    expanded: '<svg width="36" height="36" viewBox="0 0 36 36" fill="none" aria-hidden="true">' +
+      '<rect width="36" height="36" rx="4" fill="#2066DF"/>' +
+      '<path d="M27.0181 12.5H19.0181V15H27.0181V12.5Z" fill="white"/>' +
+      '<path d="M27.0181 21H19.0181V23.5H27.0181V21Z" fill="white"/>' +
+      '<path d="M13.7862 19.25H27.0181V16.75H13.7845L17.7516 12.7823L15.9837 11.0146L9.00018 17.9993L15.9841 24.9839L17.752 23.2162L13.7862 19.25Z" fill="white"/>' +
+      '</svg>',
+    collapsed: '<svg width="36" height="36" viewBox="0 0 36 36" fill="none" aria-hidden="true">' +
+      '<path d="M9 12.5H17V15H9V12.5Z" fill="#232729"/>' +
+      '<path d="M9 21H17V23.5H9V21Z" fill="#232729"/>' +
+      '<path d="M22.2319 19.25H9V16.75H22.2336L18.2665 12.7823L20.0344 11.0146L27.0179 17.9993L20.034 24.9839L18.2661 23.2162L22.2319 19.25Z" fill="#232729"/>' +
+      '</svg>',
+  };
 
   const railToggle = document.getElementById('railToggle');
-  railToggle.innerHTML = RAIL_TOGGLE_ICON;
+  railToggle.innerHTML = RAIL_TOGGLE_ICONS.expanded;
 
   function toggleRail() {
     const content = document.querySelector('#screen-uploads .content');
     const collapsed = content.classList.toggle('rail-collapsed');
+    railToggle.classList.toggle('collapsed', collapsed);
+    railToggle.innerHTML = RAIL_TOGGLE_ICONS[collapsed ? 'collapsed' : 'expanded'];
     railToggle.title = collapsed ? 'Expand Saved Views' : 'Collapse Saved Views';
     railToggle.setAttribute('aria-expanded', String(!collapsed));
-    // TODO: swap in the collapsed-state asset once it lands. Mirroring the
-    // expanded one keeps the arrow pointing the right way in the meantime.
-    railToggle.querySelector('svg').style.transform = collapsed ? 'scaleX(-1)' : '';
     scheduleStickyUpdate();
   }
 
