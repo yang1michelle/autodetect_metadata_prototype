@@ -502,6 +502,26 @@
 
   .mcell.not-detected { border-color: transparent; background: transparent; cursor: pointer; }
   .mcell.not-detected:hover { border-color: transparent; background: transparent; }
+
+  /* ── Optional field states ──
+     Nothing is wrong with an empty optional field, so it gets none of the error
+     treatment. Where detection actually failed the cell still reads as empty
+     and only surfaces its control — and the warning explaining the failure —
+     once the user hovers it. Where detection correctly found nothing to record,
+     the cell is simply empty with nothing to reveal. */
+  .mcell.optional-missing,
+  .mcell.empty-detected { border-color: transparent; background: transparent; }
+  .mcell.empty-detected { cursor: pointer; }
+  .mcell.optional-missing .opt-field { opacity: 0; transition: opacity .12s ease; }
+  .mcell.optional-missing:hover .opt-field,
+  .mcell.optional-missing:focus-within .opt-field { opacity: 1; }
+  .opt-field {
+    display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; height: 34px;
+    border: 1px solid var(--gray-85); border-radius: var(--radius-md); padding: 0 10px;
+    background: var(--white);
+  }
+  .opt-field .err-ph { flex: 1; min-width: 0; color: var(--gray-50); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .opt-field .err-chev { color: var(--gray-40); flex-shrink: 0; font-size: 11px; }
   .err-field {
     display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; height: 34px;
     border: 1px solid var(--red-50); border-radius: var(--radius-md); padding: 0 10px;
@@ -1089,7 +1109,7 @@
         'Revision':       { value: 'C01',                              source: 'filename', at: 1600 },
         'Originator':     { value: 'CGD',                              source: 'ml',       at: 2000 },
         'Description':    { value: 'First Floor Dimension Plan',       source: 'ml',       at: 2350 },
-        'Classification': { value: 'S4 - Suitable for Stage Approval', source: 'ml',       at: 2700 },
+        'Classification': { status: 'empty',                                               at: 2700 },
       }
     },
     { // DR-A-1990.pdf — filename carries only type and discipline, so the
@@ -1103,9 +1123,9 @@
         'Type':           { value: 'Drawing',                        source: 'filename', at: 1200 },
         'Discipline':     { value: 'Architectural',                  source: 'filename', at: 1500 },
         'Revision':       { value: 'P02',                            source: 'ml',       at: 2400 },
-        'Description':    { status: 'missing',                                           at: 3100 },
+        'Description':    { status: 'missing', reason: 'not_in_content',                  at: 3100 },
         'Originator':     { value: 'CGD',                            source: 'ml',       at: 3400 },
-        'Classification': { status: 'missing',                                           at: 4200 },
+        'Classification': { status: 'missing', reason: 'not_in_content',                  at: 4200 },
       }
     },
     { // A113_FIRST FLOOR…CEILING PLAN.pdf — only the sheet number is parseable
@@ -1128,14 +1148,14 @@
         'Type':           { status: 'missing', reason: 'invalid_or_inactive',           at: 3000 },
         'Revision':       { value: 'C02',                           source: 'ml',       at: 3900 },
         'Originator':     { value: 'CGD',                           source: 'ml',       at: 4700 },
-        'Classification': { status: 'missing',                                          at: 5600 },
+        'Classification': { status: 'missing', reason: 'not_in_content',                 at: 5600 },
       }
     },
     { // A111_FIRST FLOOR…ENSION PLAN.pdf
       name: [{ value: 'PN-CGD-DR-A-A111', source: 'filename', at: 1950, final: true }],
       fields: {
         'Discipline':     { value: 'Architectural',                   source: 'filename', at: 1850 },
-        'Description':    { status: 'missing',                                            at: 2200 },
+        'Description':    { status: 'missing', reason: 'not_in_content',                   at: 2200 },
         'Type':           { value: 'Drawing',                         source: 'ml',       at: 3400 },
         'Revision':       { value: 'P01',                             source: 'ml',       at: 4400 },
         'Originator':     { value: 'CGD',                             source: 'ml',       at: 5300 },
@@ -1161,7 +1181,7 @@
                         options: ['Architectural', 'Civil', 'Structural', 'Electrical', 'Mechanical'] },
     'Originator':     { required: false, control: 'dropdown', placeholder: 'Select Originator',
                         options: ['CGD', 'MEP', 'STR'] },
-    'Classification': { required: true,  control: 'dropdown', placeholder: 'Select Classification',
+    'Classification': { required: false, control: 'dropdown', placeholder: 'Select Classification',
                         options: ['S1 - Suitable for Coordination', 'S2 - Suitable for Information',
                                   'S3 - Suitable for Review and Comment', 'S4 - Suitable for Stage Approval',
                                   'A1 - Authorized and Accepted'] },
@@ -1173,6 +1193,8 @@
   const NOT_DETECTED_REASONS = {
     // nothing to detect — the filename carried no such segment
     not_in_filename:     'This value was not detected in the file name. Please enter a value manually.',
+    // the same, for fields only ever read out of the document itself
+    not_in_content:      'This value was not detected in the file content.',
     // dropdown fields: a value was detected, but it is not a selectable option
     // here — either absent from the system or present but deactivated
     invalid_or_inactive: 'This value is invalid or inactive. Please select a valid option.',
@@ -1242,8 +1264,10 @@
     // wire loading-cell interactions
     tableMode.querySelectorAll('.mcell').forEach(cell => {
       cell.addEventListener('mouseenter', () => {
-        if (!cell.classList.contains('manual') && !cell.classList.contains('detected')
-            && !cell.classList.contains('not-detected')) showCellTooltip(cell);
+        // only while the cell is genuinely still detecting — testing for the
+        // spinner beats listing every settled state, which goes stale as
+        // states are added
+        if (cell.querySelector('.mini-spin')) showCellTooltip(cell);
       });
       cell.addEventListener('mouseleave', hideCellTooltip);
       // badges are info affordances, not edit targets — let them be
@@ -1353,7 +1377,8 @@
       Object.keys(plan.fields).forEach(field => {
         const d = plan.fields[field];
         state.timers.push(setTimeout(() => {
-          if (d.status === 'missing') applyMissing(i, field, d.reason);
+          if (d.status === 'empty') applyEmpty(i, field);
+          else if (d.status === 'missing') applyMissing(i, field, d.reason);
           else applyDetection(i, field, d.value, d.source);
         }, d.at));
       });
@@ -1404,23 +1429,39 @@
     const cfg = FIELD_CONFIG[field] || { control: 'text', placeholder: 'Enter text' };
     const code = NOT_DETECTED_REASONS[reason] ? reason : DEFAULT_REASON;
     cell.dataset.reason = code; // survives an edit that gets abandoned
-    cell.classList.add('not-detected');
-    cell.innerHTML =
-      `<span class="err-field">` +
-        `<span class="err-ph">${cfg.placeholder}</span>` +
-        `<button class="warn-badge" type="button" data-reason="${code}"` +
-        ` aria-label="Unable to detect — ${NOT_DETECTED_REASONS[code]}">${WARN_ICON}</button>` +
-        (cfg.control === 'dropdown' ? '<span class="err-chev">▾</span>' : '') +
-      `</span>` +
-      (cfg.required ? `<button class="err-badge" type="button" aria-label="${BLANK_FIELD_COPY}">${ERROR_ICON}</button>` : '');
 
-    const td = cell.closest('td');
-    if (td && cfg.required) td.classList.add('cell-error');
+    const warn = `<button class="warn-badge" type="button" data-reason="${code}"` +
+      ` aria-label="Unable to detect — ${NOT_DETECTED_REASONS[code]}">${WARN_ICON}</button>`;
+    const chev = cfg.control === 'dropdown' ? '<span class="err-chev">▾</span>' : '';
+
+    if (cfg.required) {
+      cell.classList.add('not-detected');
+      cell.innerHTML =
+        `<span class="err-field"><span class="err-ph">${cfg.placeholder}</span>${warn}${chev}</span>` +
+        `<button class="err-badge" type="button" aria-label="${BLANK_FIELD_COPY}">${ERROR_ICON}</button>`;
+      const td = cell.closest('td');
+      if (td) td.classList.add('cell-error');
+      (state.missing[row] = state.missing[row] || new Set()).add(field);
+    } else {
+      // optional — no error treatment, and the control only shows on hover
+      cell.classList.add('optional-missing');
+      cell.innerHTML = `<span class="opt-field"><span class="err-ph">${cfg.placeholder}</span>${warn}${chev}</span>`;
+    }
 
     state.resolved[row + '|' + field] = true;
-    if (cfg.required) {
-      (state.missing[row] = state.missing[row] || new Set()).add(field);
-    }
+    checkRowDone(row);
+  }
+
+  // Detection ran and correctly found nothing to record for an optional field.
+  // That is a success, not a failure, so the cell is plainly empty — no
+  // warning, nothing to reveal on hover.
+  function applyEmpty(row, field) {
+    const cell = document.querySelector(`#tableMode .mcell[data-row="${row}"][data-field="${field}"]`);
+    if (!cell) return;
+    if (state.manualCells[row + '|' + field]) return;
+    cell.classList.add('empty-detected');
+    cell.innerHTML = '';
+    state.resolved[row + '|' + field] = true;
     checkRowDone(row);
   }
 
@@ -1560,21 +1601,27 @@
     const row = cell.dataset.row, field = cell.dataset.field;
     const cfg = FIELD_CONFIG[field] || { control: 'text' };
     const wasDetected = cell.classList.contains('detected');
-    const wasMissing = cell.classList.contains('not-detected');
+    const wasMissing = cell.classList.contains('not-detected') || cell.classList.contains('optional-missing');
     const valueEl = wasDetected ? cell.querySelector('.mval') : null;
     const badgeEl = wasDetected ? cell.querySelector('.detect-badge') : null;
     const prevValue = valueEl ? valueEl.textContent : '';
     const prevSource = badgeEl ? badgeEl.dataset.source : '';
 
     if (!wasDetected) state.manualCells[row + '|' + field] = true; // detection stopped for this cell
-    cell.classList.remove('detected', 'not-detected');
+    cell.classList.remove('detected', 'not-detected', 'optional-missing', 'empty-detected');
     cell.classList.add('manual', 'editing');
 
-    // a dropdown field offers its options rather than a free-text box
+    // A dropdown field offers its options rather than a free-text box. The
+    // current value is added to the list when it is not already there —
+    // otherwise assigning it silently fails, the select falls back to its blank
+    // option, and simply opening a cell would erase a detected value.
     const useSelect = cfg.control === 'dropdown' && cfg.options;
+    const options = useSelect && prevValue && !cfg.options.includes(prevValue)
+      ? [prevValue].concat(cfg.options)
+      : (cfg.options || []);
     cell.innerHTML = useSelect
       ? `<select aria-label="${field}"><option value=""></option>` +
-        cfg.options.map(o => `<option>${o}</option>`).join('') + '</select>'
+        options.map(o => `<option>${o}</option>`).join('') + '</select>'
       : `<input type="text" aria-label="${field}">`;
 
     const input = cell.querySelector('input, select');
