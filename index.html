@@ -1115,8 +1115,6 @@
   ];
   // detection only ever concerns itself with the auto columns
   const META_COLS = COLUMNS.filter(c => c.kind === 'auto').map(c => c.field);
-  const COLS_WITH_MENU = new Set(['Description', 'Revision', 'Version',
-                                  'Placeholder Assignee', 'Placeholder Due Date']);
   // Columns that offer See All when the file is a later revision of a document
   // already in the system.
   const COLS_WITH_SEE_ALL = new Set(['Revision', 'Version']);
@@ -1263,7 +1261,7 @@
     'Originator':     { required: false, control: 'dropdown', placeholder: 'Select Originator',
                         options: ['CGD', 'MEP', 'STR'] },
     // ISO 19650 suitability codes: the state a container is issued under.
-    'Status':         { required: false, control: 'dropdown', placeholder: 'Select Status',
+    'Status':         { required: true,  control: 'dropdown', placeholder: 'Select Status',
                         options: ['S1 - Suitable for Coordination', 'S2 - Suitable for Information',
                                   'S3 - Suitable for Review and Comment', 'S4 - Suitable for Stage Approval',
                                   'A1 - Authorized and Accepted'] },
@@ -1328,7 +1326,7 @@
     COLUMNS.forEach(col => {
       thead += `<th class="th-meta"><div class="th-inner">${col.field}` +
         (col.help ? ` <span class="q">${HELP_ICON}</span>` : '') +
-        (COLS_WITH_MENU.has(col.field) ? ' <span class="th-menu">⋮</span>' : '') +
+        ' <span class="th-menu">⋮</span>' +
         '</div></th>';
     });
     thead += '</tr>';
