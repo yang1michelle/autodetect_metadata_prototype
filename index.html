@@ -1099,17 +1099,23 @@
   // 'static' ones are not — Version is written by the system elsewhere and only
   // ever reads Pending here.
   const COLUMNS = [
-    { field: 'Description',    kind: 'auto' },
-    { field: 'Type',           kind: 'auto' },
-    { field: 'Revision',       kind: 'auto' },
-    { field: 'Version',        kind: 'static', help: true },
-    { field: 'Discipline',     kind: 'auto' },
-    { field: 'Originator',     kind: 'auto' },
-    { field: 'Classification', kind: 'auto' },
+    { field: 'Description',          kind: 'auto' },
+    { field: 'Type',                 kind: 'auto' },
+    // Placeholder columns belong to a different item type, so on an upload row
+    // they are not merely empty but inapplicable — nothing to detect, nothing
+    // to fill in.
+    { field: 'Placeholder Assignee', kind: 'static', help: true },
+    { field: 'Placeholder Due Date', kind: 'static', help: true },
+    { field: 'Revision',             kind: 'auto' },
+    { field: 'Version',              kind: 'static', help: true, text: 'Pending' },
+    { field: 'Discipline',           kind: 'auto' },
+    { field: 'Originator',           kind: 'auto' },
+    { field: 'Classification',       kind: 'auto' },
   ];
   // detection only ever concerns itself with the auto columns
   const META_COLS = COLUMNS.filter(c => c.kind === 'auto').map(c => c.field);
-  const COLS_WITH_MENU = new Set(['Description', 'Revision', 'Version']);
+  const COLS_WITH_MENU = new Set(['Description', 'Revision', 'Version',
+                                  'Placeholder Assignee', 'Placeholder Due Date']);
   // Columns that offer See All when the file is a later revision of a document
   // already in the system.
   const COLS_WITH_SEE_ALL = new Set(['Revision', 'Version']);
@@ -1332,7 +1338,7 @@
           ? '<button class="see-all" type="button">See All</button>' : '';
         const body = col.kind === 'auto'
           ? `<div class="mcell" data-row="${i}" data-field="${col.field}" tabindex="0"><span class="mini-spin"></span></div>`
-          : '<span class="vpending">Pending</span>';
+          : (col.text ? `<span class="vpending">${col.text}</span>` : '');
         cells += `<td><div class="cell-row">${body}${seeAll}</div></td>`;
       });
       tbody += `<tr>${cells}</tr>`;
