@@ -1108,6 +1108,7 @@
     { field: 'Placeholder Due Date', kind: 'static', help: true },
     { field: 'Revision',             kind: 'auto' },
     { field: 'Version',              kind: 'static', help: true, text: 'Pending' },
+    { field: 'Status',               kind: 'auto' },
     { field: 'Discipline',           kind: 'auto' },
     { field: 'Originator',           kind: 'auto' },
     { field: 'Classification',       kind: 'auto' },
@@ -1168,7 +1169,8 @@
         'Revision':       { value: 'C01',                              source: 'ml',       at: 1500 },
         'Originator':     { value: 'CGD',                              source: 'ml',       at: 1800 },
         'Description':    { value: 'First Floor Dimension Plan',       source: 'ml',       at: 2100 },
-        'Classification': { value: 'S4 - Suitable for Stage Approval', source: 'ml',       at: 2400 },
+        'Status':         { value: 'S4 - Suitable for Stage Approval', source: 'ml',       at: 2400 },
+        'Classification': { status: 'empty',                                               at: 2500 },
       }
     },
     { // DR-A-111-code1-A.pdf — same sheet as above, uploaded a second time with
@@ -1181,7 +1183,8 @@
         'Revision':       { value: 'C01',                              source: 'filename', at: 1600 },
         'Originator':     { value: 'CGD',                              source: 'ml',       at: 2000 },
         'Description':    { value: 'First Floor Dimension Plan',       source: 'ml',       at: 2350 },
-        'Classification': { status: 'empty',                                               at: 2700 },
+        'Status':         { value: 'S4 - Suitable for Stage Approval', source: 'ml',       at: 2700 },
+        'Classification': { status: 'empty',                                               at: 2800 },
       }
     },
     { // DR-A-1990.pdf — filename carries only type and discipline, so the
@@ -1198,7 +1201,8 @@
         'Revision':       { value: 'P02',                            source: 'ml',       at: 2400 },
         'Description':    { status: 'missing', reason: 'not_in_content',                  at: 3100 },
         'Originator':     { value: 'CGD',                            source: 'ml',       at: 3400 },
-        'Classification': { status: 'missing', reason: 'not_in_content',                  at: 4200 },
+        'Status':         { value: 'S2 - Suitable for Information',   source: 'ml',       at: 4200 },
+        'Classification': { status: 'empty',                                              at: 4300 },
       }
     },
     { // A113_FIRST FLOOR…CEILING PLAN.pdf — only the sheet number is parseable
@@ -1210,7 +1214,8 @@
         'Type':           { value: 'Drawing',                              source: 'ml',       at: 2600 },
         'Revision':       { value: 'P01',                                  source: 'ml',       at: 3300 },
         'Originator':     { value: 'CGD',                                  source: 'ml',       at: 4100 },
-        'Classification': { status: 'missing', reason: 'invalid_or_inactive',                   at: 4800 },
+        'Status':         { value: 'S3 - Suitable for Review and Comment', source: 'ml',       at: 4800 },
+        'Classification': { status: 'empty',                                                    at: 4900 },
       }
     },
     { // A003_Life Safety Plans.pdf
@@ -1222,7 +1227,8 @@
         'Type':           { status: 'missing', reason: 'invalid_or_inactive',           at: 3000 },
         'Revision':       { value: 'C02',                           source: 'ml',       at: 3900 },
         'Originator':     { value: 'CGD',                           source: 'ml',       at: 4700 },
-        'Classification': { status: 'missing', reason: 'not_in_content',                 at: 5600 },
+        'Status':         { value: 'A1 - Authorized and Accepted',   source: 'ml',       at: 5600 },
+        'Classification': { status: 'empty',                                             at: 5700 },
       }
     },
     { // A111_FIRST FLOOR…ENSION PLAN.pdf
@@ -1233,7 +1239,8 @@
         'Type':           { value: 'Drawing',                         source: 'ml',       at: 3400 },
         'Revision':       { value: 'P01',                             source: 'ml',       at: 4400 },
         'Originator':     { value: 'CGD',                             source: 'ml',       at: 5300 },
-        'Classification': { value: 'S1 - Suitable for Coordination',  source: 'ml',       at: 6400 },
+        'Status':         { value: 'S1 - Suitable for Coordination',  source: 'ml',       at: 6400 },
+        'Classification': { status: 'empty',                                              at: 6500 },
       }
     },
   ];
@@ -1255,10 +1262,14 @@
                         options: ['Architectural', 'Civil', 'Structural', 'Electrical', 'Mechanical'] },
     'Originator':     { required: false, control: 'dropdown', placeholder: 'Select Originator',
                         options: ['CGD', 'MEP', 'STR'] },
-    'Classification': { required: false, control: 'dropdown', placeholder: 'Select Classification',
+    // ISO 19650 suitability codes: the state a container is issued under.
+    'Status':         { required: false, control: 'dropdown', placeholder: 'Select Status',
                         options: ['S1 - Suitable for Coordination', 'S2 - Suitable for Information',
                                   'S3 - Suitable for Review and Comment', 'S4 - Suitable for Stage Approval',
                                   'A1 - Authorized and Accepted'] },
+    // Uniclass, per the project's classification table — left unpopulated until
+    // the real codes are supplied rather than invented here.
+    'Classification': { required: false, control: 'dropdown', placeholder: 'Select Classification', options: [] },
   };
 
   // Why a field came back empty. A plan entry names one of these; the code
