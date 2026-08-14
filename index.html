@@ -595,6 +595,19 @@
      which sits one border + one padding step in from the cell edge. */
   table.uploads thead th.th-meta { padding-left: 27px; }
 
+  /* Cell body plus anything sitting alongside it, such as See All. */
+  .cell-row { display: flex; align-items: center; gap: 8px; }
+  .cell-row .mcell { flex: 1; min-width: 0; }
+  /* Version is not detected — it always reads Pending, indented to match the
+     value text in the detection columns beside it. */
+  .vpending { padding-left: 11px; color: #5E696E; white-space: nowrap; }
+  .see-all {
+    flex-shrink: 0; padding: 0 12px; height: 28px;
+    background: var(--gray-90); border: none; border-radius: var(--radius-md);
+    font-size: 13px; font-weight: 600; color: var(--gray-20);
+  }
+  .see-all:hover { background: var(--gray-85); }
+
   /* Required Action — row is fully detected and ready to submit */
   .req-submit {
     display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px;
@@ -1082,9 +1095,24 @@
 
   // ─────────── Upload → populated processing table ───────────
   // Fuller PDM metadata column set (the auto-detect / loading cells).
-  const META_COLS = ['Description', 'Type', 'Revision', 'Discipline', 'Originator', 'Classification'];
-  // 'Description' shows the column-options (⋮) affordance, per the mock.
-  const COLS_WITH_MENU = new Set(['Description']);
+  // The table's columns in order. 'auto' columns are filled by detection;
+  // 'static' ones are not — Version is written by the system elsewhere and only
+  // ever reads Pending here.
+  const COLUMNS = [
+    { field: 'Description',    kind: 'auto' },
+    { field: 'Type',           kind: 'auto' },
+    { field: 'Revision',       kind: 'auto' },
+    { field: 'Version',        kind: 'static', help: true },
+    { field: 'Discipline',     kind: 'auto' },
+    { field: 'Originator',     kind: 'auto' },
+    { field: 'Classification', kind: 'auto' },
+  ];
+  // detection only ever concerns itself with the auto columns
+  const META_COLS = COLUMNS.filter(c => c.kind === 'auto').map(c => c.field);
+  const COLS_WITH_MENU = new Set(['Description', 'Revision', 'Version']);
+  // Columns that offer See All when the file is a later revision of a document
+  // already in the system.
+  const COLS_WITH_SEE_ALL = new Set(['Revision', 'Version']);
   state.manualCells = {}; // "rowIdx|Field" -> true once user takes over (detection stopped)
 
   const FILE_DETAIL_ICON = fileDetailIcon(18);
@@ -1098,6 +1126,11 @@
     '<path d="M8.88711 7.11321C8.55167 6.77777 8.25611 6.41038 8.00016 6.01441C8.83673 4.72019 9.25016 3.12068 9.25016 1.3335C9.25016 3.16619 9.79506 4.48563 10.6549 5.34545C11.5147 6.20527 12.8341 6.75016 14.6668 6.75016V9.25017C12.3329 9.25017 10.319 8.54506 8.88711 7.11321Z" fill="#FF5100"/>' +
     '<path d="M7.11321 8.88713C5.68137 7.45528 3.66746 6.75017 1.3335 6.75017V9.25018C3.16619 9.25018 4.48563 9.79507 5.34545 10.6549C6.20527 11.5147 6.75016 12.8341 6.75016 14.6668C6.75016 12.8797 7.16359 11.2801 8.00016 9.98592C7.74421 9.58996 7.44866 9.22257 7.11321 8.88713Z" fill="#FF5100"/>' +
     '</svg>';
+
+  const HELP_ICON = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">' +
+    '<circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/>' +
+    '<path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.8.4-1 .9-1 1.7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>' +
+    '<circle cx="12" cy="16.5" r="1" fill="currentColor"/></svg>';
 
   const CHECK_ICON = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
@@ -1122,6 +1155,7 @@
       // written with a letter O rather than a zero, so the filename parser
       // misses it and the ML pass recovers it from the title block instead.
       name: [{ value: 'PN-CGD-DR-A-A111', source: 'filename', at: 1200, final: true }],
+      hasPriorVersions: true,
       fields: {
         'Type':           { value: 'Drawing',                          source: 'filename', at: 900  },
         'Discipline':     { value: 'Architectural',                    source: 'filename', at: 1100 },
@@ -1134,6 +1168,7 @@
     { // DR-A-111-code1-A.pdf — same sheet as above, uploaded a second time with
       // a cleaner name, so the revision does come off the filename here.
       name: [{ value: 'PN-CGD-DR-A-A111', source: 'filename', at: 1350, final: true }],
+      hasPriorVersions: true,
       fields: {
         'Type':           { value: 'Drawing',                          source: 'filename', at: 1000 },
         'Discipline':     { value: 'Architectural',                    source: 'filename', at: 1250 },
@@ -1150,6 +1185,7 @@
         { value: 'PN-__-DR-A-1990',  source: 'filename', at: 1400, final: false },
         { value: 'PN-CGD-DR-A-1990', source: 'ml',       at: 3400, final: true  },
       ],
+      hasPriorVersions: true,
       fields: {
         'Type':           { value: 'Drawing',                        source: 'filename', at: 1200 },
         'Discipline':     { value: 'Architectural',                  source: 'filename', at: 1500 },
@@ -1173,6 +1209,7 @@
     },
     { // A003_Life Safety Plans.pdf
       name: [{ value: 'PN-CGD-DR-A-A003', source: 'filename', at: 1750, final: true }],
+      hasPriorVersions: true,
       fields: {
         'Discipline':     { value: 'Architectural',                 source: 'filename', at: 1650 },
         'Description':    { value: 'Life Safety Plans',             source: 'ml',       at: 1950 },
@@ -1271,8 +1308,11 @@
       '<th><div class="th-inner">Required Action</div></th>' +
       '<th><div class="th-inner">File <span class="th-menu">⋮</span></div></th>' +
       '<th><div class="th-inner">Name <span class="th-menu">⋮</span></div></th>';
-    META_COLS.forEach(c => {
-      thead += `<th class="th-meta"><div class="th-inner">${c}${COLS_WITH_MENU.has(c) ? ' <span class="th-menu">⋮</span>' : ''}</div></th>`;
+    COLUMNS.forEach(col => {
+      thead += `<th class="th-meta"><div class="th-inner">${col.field}` +
+        (col.help ? ` <span class="q">${HELP_ICON}</span>` : '') +
+        (COLS_WITH_MENU.has(col.field) ? ' <span class="th-menu">⋮</span>' : '') +
+        '</div></th>';
     });
     thead += '</tr>';
 
@@ -1284,8 +1324,16 @@
         <td data-req="${i}"><span class="req-processing"><span class="mini-spin"></span> Processing</span></td>
         <td><span class="file-cell"><a class="file-link" href="#" onclick="return false">${f.name}</a></span></td>
         <td data-name="${i}"><span class="name-placeholder">—-—-—-—</span></td>`;
-      META_COLS.forEach(field => {
-        cells += `<td><div class="mcell" data-row="${i}" data-field="${field}" tabindex="0"><span class="mini-spin"></span></div></td>`;
+      // Later revisions of a document already in the system offer See All. It
+      // sits outside the detection cell so redrawing that cell cannot lose it.
+      const priorVersions = (DETECTION[f.srcIndex] || {}).hasPriorVersions;
+      COLUMNS.forEach(col => {
+        const seeAll = priorVersions && COLS_WITH_SEE_ALL.has(col.field)
+          ? '<button class="see-all" type="button">See All</button>' : '';
+        const body = col.kind === 'auto'
+          ? `<div class="mcell" data-row="${i}" data-field="${col.field}" tabindex="0"><span class="mini-spin"></span></div>`
+          : '<span class="vpending">Pending</span>';
+        cells += `<td><div class="cell-row">${body}${seeAll}</div></td>`;
       });
       tbody += `<tr>${cells}</tr>`;
     });

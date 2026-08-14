@@ -18,7 +18,8 @@ then visit http://localhost:8000
 2. **Upload File** — opens a simulated macOS Finder dialog with a sample set of PDFs
 3. **Open** — files upload and the table switches to the populated processing state
 4. **Metadata columns** (Description, Type, Revision, Discipline, Originator,
-   Classification) show per-cell loading spinners while detection runs. Hovering
+   Classification) show per-cell loading spinners while detection runs. Version
+   sits among them but is never detected — it always reads *Pending*. Hovering
    a cell explains what's happening; clicking one takes over manually and stops
    auto-detection for that cell.
 5. **Detection lands progressively.** Each field resolves on its own timer, so
